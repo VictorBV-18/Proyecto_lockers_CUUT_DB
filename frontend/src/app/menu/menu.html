@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Menu Principal</title>
+</head>
+<body style="background-color: white; color: black; font-family: sans-serif;">
+
+    <h2>Menu de Tramites CUUT</h2>
+    <p>Selecciona el tramite que deseas realizar</p>
+    
+    <button type="button" onclick="irALocker()">Solicitar Locker</button>
+    
+    <br><br>
+    
+    <button type="button" onclick="irAEstacionamiento()">Solicitar Estacionamiento</button>
+
+    <script>
+        const cuenta = localStorage.getItem("cuentaUsuario")
+        
+        if (!cuenta) {
+            alert("por favor inicia sesion primero")
+            window.location.href = "../login/login.html"
+        }
+
+        // actualizamos las funciones para que te lleven a las paginas nuevas
+        function irALocker() {
+            window.location.href = "../lockers/lockers.html"
+        }
+
+        function irAEstacionamiento() {
+            window.location.href = "../estacionamiento/estacionamiento.html"
+        }
+    </script>
+
+</body>
+</html>
