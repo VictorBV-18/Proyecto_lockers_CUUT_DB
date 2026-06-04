@@ -1,45 +1,14 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Login</title>
-</head>
-<body style="background-color: white; color: black; font-family: sans-serif;">
+<div style="font-family: sans-serif; padding: 2rem;">
+  <h2>Sistema de Lockers CUUT</h2>
 
-    <h2>Sistema de Lockers CUUT</h2>
-    
-    <form>
-        <label for="cuenta">Numero de Cuenta:</label>
-        <input type="text" id="cuenta" name="cuenta" placeholder="Coloca tu numero de cuenta">
-        <br><br>
-        
-        <button type="button" onclick="enviarDatos()">Ingresar al Sistema</button>
-    </form>
+  <label for="cuenta">Numero de Cuenta:</label>
+  <input
+    id="cuenta"
+    type="text"
+    [(ngModel)]="numeroCuenta"
+    placeholder="Coloca tu numero de cuenta"
+  />
+  <br /><br />
 
-    <script>
-        // esta funcion toma el texto y lo manda a python
-        function enviarDatos() {
-            const cuentaUsuario = document.getElementById('cuenta').value
-            
-            fetch('http://127.0.0.1:8000/login/?numero_cuenta=' + cuentaUsuario, {
-                method: 'POST'
-            })
-            .then(respuesta => respuesta.json())
-            .then(datos => {
-                if (datos.rol === "alumno") {
-                    // guardamos la cuenta en la memoria del navegador para no olvidarla
-                    localStorage.setItem("cuentaUsuario", cuentaUsuario)
-                    alert(datos.mensaje)
-                    // te mandamos a la nueva pagina del menu
-                    window.location.href = "../menu/menu.html"
-                } else {
-                    // si la cuenta no existe mostramos el error
-                    alert(datos.mensaje)
-                }
-            })
-            .catch(error => console.log("hubo un error", error))
-        }
-    </script>
-
-</body>
-</html>
+  <button type="button" (click)="ingresar()">Ingresar al Sistema</button>
+</div>
