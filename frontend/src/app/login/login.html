@@ -1,14 +1,111 @@
-<div style="font-family: sans-serif; padding: 2rem;">
-  <h2>Sistema de Lockers CUUT</h2>
-
-  <label for="cuenta">Numero de Cuenta:</label>
-  <input
-    id="cuenta"
-    type="text"
-    [(ngModel)]="numeroCuenta"
-    placeholder="Coloca tu numero de cuenta"
-  />
-  <br /><br />
-
-  <button type="button" (click)="ingresar()">Ingresar al Sistema</button>
-</div>
+<body>
+  <!-- Decoraciones de fondo -->
+  <div class="bg-decor bg-decor--book" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+         stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 6.5C10.5 5 8 4.5 5 4.5v12c3 0 5.5.5 7 2 1.5-1.5 4-2 7-2v-12c-3 0-5.5.5-7 2Z" />
+      <path d="M12 6.5v12" />
+    </svg>
+  </div>
+ 
+  <div class="bg-decor bg-decor--badge" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+         stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="9" r="6" />
+      <path d="m9 14-2 7 5-3 5 3-2-7" />
+      <path d="M12 6.5 13 8.6l2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3Z" />
+    </svg>
+  </div>
+ 
+  <!-- Tarjeta principal -->
+  <main class="card">
+    <header class="card__brand">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M22 10 12 5 2 10l10 5 10-5Z" />
+          <path d="M6 12v5c0 1 2.7 2.5 6 2.5s6-1.5 6-2.5v-5" />
+        </svg>
+      </div>
+      <h1 class="logo-title">Portal Estudiantil</h1>
+      <p class="logo-subtitle">Centro Universitario UAEMex Tianguistenco</p>
+    </header>
+ 
+    <section class="card__welcome">
+      <h2 class="welcome-title">Bienvenido al Portal Estudiantil</h2>
+      <p class="welcome-text">Ingresa tus credenciales institucionales</p>
+    </section>
+ 
+    <form class="form" autocomplete="off" onsubmit="return false;">
+      <div class="field">
+        <label for="username" class="field__label">username</label>
+        <div class="input">
+          <span class="input__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
+              <path d="m3 6 9 7 9-7" />
+            </svg>
+          </span>
+          <input id="username" type="text" placeholder="2370616" />
+        </div>
+      </div>
+ 
+      <div class="field">
+        <label for="password" class="field__label">Contraseña</label>
+        <div class="input">
+          <span class="input__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+              <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" />
+            </svg>
+          </span>
+          <input id="password" type="password" placeholder="*******" />
+          <button type="button" class="input__toggle" aria-label="Mostrar contraseña"
+                  onclick="togglePassword(this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
+        </div>
+      </div>
+ 
+      <a href="#" class="forgot">Olvidé mi contraseña</a>
+ 
+      <button type="submit" class="btn-login" (click)="login()">
+        <span>Iniciar Sesión</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10 17l5-5-5-5" />
+          <path d="M13.8 12H3" />
+          <path d="M21 4v16" />
+        </svg>
+      </button>
+    </form>
+ 
+    <footer class="card__footer">
+      <div class="ssl">
+        <span class="ssl__avatar" aria-hidden="true"></span>
+        <div class="ssl__text">
+          <p class="ssl__title">Acceso Seguro SSL</p>
+          <p class="ssl__copy">© 2024 Universidad Global</p>
+        </div>
+      </div>
+    </footer>
+  </main>
+ 
+  <p class="help">¿Necesitas ayuda? <a href="#">Soporte Técnico</a></p>
+ 
+  <script>
+    function togglePassword(btn) {
+      const input = document.getElementById('password');
+      const isHidden = input.type === 'password';
+      input.type = isHidden ? 'text' : 'password';
+      btn.setAttribute('aria-label', isHidden ? 'Ocultar contraseña' : 'Mostrar contraseña');
+      btn.classList.toggle('input__toggle--active', isHidden);
+    }
+  </script>
+</body>

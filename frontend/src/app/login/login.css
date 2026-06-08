@@ -1,0 +1,230 @@
+.bg-decor {
+  position: fixed;
+  color: var(--neutral);
+  opacity: 0.16;
+  pointer-events: none;
+  z-index: 0;
+}
+.bg-decor svg { width: 100%; height: 100%; }
+ 
+.bg-decor--book {
+  top: 6%;
+  left: 6%;
+  width: 130px;
+  height: 130px;
+}
+.bg-decor--badge {
+  bottom: 8%;
+  right: 6%;
+  width: 130px;
+  height: 130px;
+}
+ 
+/* ---------- Tarjeta ---------- */
+.card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 500px;
+  background: var(--white);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 40px 44px 32px;
+}
+ 
+/* ---------- Marca ---------- */
+.card__brand {
+  text-align: center;
+  margin-bottom: 26px;
+}
+.logo {
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  display: grid;
+  place-items: center;
+  color: var(--white);
+  box-shadow: 0 10px 24px -8px rgba(0, 99, 65, 0.55);
+}
+.logo svg { width: 38px; height: 38px; }
+ 
+.logo-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: -0.3px;
+}
+.logo-subtitle {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+ 
+/* ---------- Bienvenida ---------- */
+.card__welcome {
+  text-align: center;
+  margin-bottom: 28px;
+}
+.welcome-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+}
+.welcome-text {
+  margin-top: 6px;
+  font-size: 15px;
+  color: var(--text-soft);
+}
+ 
+/* ---------- Formulario ---------- */
+.form { display: flex; flex-direction: column; }
+ 
+.field { margin-bottom: 18px; }
+.field__label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+ 
+.input {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--field-bg);
+  border: 1.5px solid var(--field-line);
+  border-radius: var(--radius-field);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+.input:focus-within {
+  border-color: var(--primary);
+  background: var(--white);
+  box-shadow: 0 0 0 3px rgba(0, 99, 65, 0.12);
+}
+ 
+.input__icon {
+  display: grid;
+  place-items: center;
+  padding-left: 16px;
+  color: var(--neutral);
+}
+.input__icon svg { width: 20px; height: 20px; }
+ 
+.input input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: var(--font);
+  font-size: 16px;
+  color: var(--text);
+  padding: 15px 14px;
+}
+.input input::placeholder { color: var(--text-muted); }
+ 
+.input__toggle {
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0 16px;
+  color: var(--neutral);
+  transition: color 0.18s ease;
+}
+.input__toggle svg { width: 20px; height: 20px; }
+.input__toggle:hover,
+.input__toggle--active { color: var(--primary); }
+ 
+/* ---------- Olvidé contraseña ---------- */
+.forgot {
+  align-self: flex-end;
+  margin: 2px 0 22px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+}
+.forgot:hover { text-decoration: underline; }
+ 
+/* ---------- Botón principal ---------- */
+.btn-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 17px;
+  border: none;
+  border-radius: var(--radius-field);
+  background: var(--primary-dark);
+  color: var(--white);
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.12s ease, box-shadow 0.18s ease;
+  box-shadow: 0 10px 22px -10px rgba(12, 61, 39, 0.6);
+}
+.btn-login svg { width: 20px; height: 20px; }
+.btn-login:hover { background: var(--primary-darker); }
+.btn-login:active { transform: translateY(1px); }
+ 
+/* ---------- Footer de la tarjeta ---------- */
+.card__footer {
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+.ssl {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.ssl__avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background:
+    linear-gradient(160deg, #4a5d3f 0%, #2c3a25 55%, #1d2719 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+.ssl__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.ssl__copy {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+ 
+/* ---------- Ayuda ---------- */
+.help {
+  position: relative;
+  z-index: 1;
+  font-size: 14px;
+  color: var(--text-soft);
+}
+.help a {
+  color: var(--primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+.help a:hover { text-decoration: underline; }
+ 
+/* ---------- Responsive ---------- */
+@media (max-width: 540px) {
+  .card { padding: 32px 24px 26px; }
+  .logo-title { font-size: 24px; }
+  .welcome-title { font-size: 19px; }
+  .bg-decor { width: 90px; height: 90px; }
+}
