@@ -8,7 +8,7 @@ import { Estacionamiento } from './estacionamiento/estacionamiento';
 const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
   { path: 'login', component: Login },
-  { path: 'menu', component: Menu },
+  { path: 'home', component: Menu },
   { path: 'lockers', component: Lockers },
   { path: 'estacionamiento', component: Estacionamiento },
 ];
