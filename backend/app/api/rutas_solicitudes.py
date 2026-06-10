@@ -143,10 +143,9 @@ async def subir_documento(
 ##############################################################
 ###########Cambios Agregados Vic##############################
 
-# CONSULTAR SOLICITUDES POR NUMERO DE CUENTA 
+# CONSULTAR SOLICITUDES POR NUMERO DE CUENTA
 @router.get("/solicitudes/{numero_cuenta}")
 def consultar_solicitudes_por_alumno(numero_cuenta: str):
-
     conexion = conectar_base()
 
     if conexion is None:
@@ -155,59 +154,64 @@ def consultar_solicitudes_por_alumno(numero_cuenta: str):
     try:
         cursor = conexion.cursor()
 
-        # Buscar alumno
         cursor.execute(
             """
-            SELECT id_alumno, nombre, apellidos
+            SELECT id_alumno
             FROM alumno
             WHERE numero_cuenta = %s
             """,
             (numero_cuenta,)
         )
-
         alumno = cursor.fetchone()
 
         if not alumno:
             cursor.close()
             conexion.close()
-
-            raise HTTPException(
-                status_code=404,
-                detail="Alumno no encontrado"
-            )
+            raise HTTPException(status_code=404, detail="Alumno no encontrado")
 
         id_alumno = alumno[0]
 
-        # Consultar solicitudes y documentos
         cursor.execute(
             """
             SELECT
                 s.id_solicitud,
                 s.tipo_tramite,
-                s.estado,
-                ds.id_documento,
+                s.estado AS estado_solicitud,
+                ds.id_tipo_documento,
                 ds.archivo_path
             FROM solicitud s
             LEFT JOIN documentos_solicitud ds
                 ON s.id_solicitud = ds.id_solicitud
             WHERE s.id_alumno = %s
-            ORDER BY s.id_solicitud
+            ORDER BY s.id_solicitud, ds.id_tipo_documento
             """,
             (id_alumno,)
         )
 
-        resultados = cursor.fetchall()
+        filas = cursor.fetchall()
+
+        solicitudes = []
+
+        for fila in filas:
+            solicitudes.append({
+                "id_solicitud": fila[0],
+                "tipo_tramite": fila[1],
+                "estado_solicitud": fila[2],
+                "id_tipo_documento": fila[3],
+                "archivo": fila[4]
+            })
 
         cursor.close()
         conexion.close()
 
         return {
             "numero_cuenta": numero_cuenta,
-            "solicitudes": resultados
+            "solicitudes": solicitudes
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error en BD: {str(e)}"
-        )
+        if conexion:
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
