@@ -1,111 +1,73 @@
--- Consultas Basicas en Backend- SISTEMA LOCKERS CUUT
+-- 1. Ver alumnos registrados
+SELECT * FROM alumno ORDER BY id_alumno;
 
+-- 2. Buscar alumno por número de cuenta
+SELECT * FROM alumno WHERE numero_cuenta = '2173346';
 
--- Ver alumnos registrados
-SELECT *
-FROM alumno
-ORDER BY id_alumno;
+-- 3. Ver lockers disponibles
+SELECT * FROM locker WHERE estado = 'DISPONIBLE' ORDER BY codigo_locker;
 
--- Buscar alumno por número de cuenta
-SELECT *
-FROM alumno
-WHERE numero_cuenta = '20240001';
-
--- Ver lockers disponibles
-SELECT *
-FROM locker
-WHERE estado = 'DISPONIBLE'
-ORDER BY codigo_locker;
-
--- Ver lockers ocupados
-SELECT *
-FROM locker
-WHERE estado = 'OCUPADO'
-ORDER BY codigo_locker;
-
--- Ver lockers en mantenimiento
-SELECT *
-FROM locker
-WHERE estado = 'MANTENIMIENTO'
-ORDER BY codigo_locker;
-
--- Ver solicitudes pendientes
+-- 4. Ver solicitudes pendientes (Incluyendo el tipo de trámite)
 SELECT 
     s.id_solicitud,
+    s.tipo_tramite,
     a.numero_cuenta,
     a.nombre,
     a.apellidos,
-    a.carrera_abreviatura,
     s.fecha_solicitud,
-    s.estado,
-    s.observacion_alumno
+    s.estado
 FROM solicitud s
 JOIN alumno a ON s.id_alumno = a.id_alumno
 WHERE s.estado = 'PENDIENTE'
 ORDER BY s.fecha_solicitud DESC;
 
--- Ver documentos por solicitud
+-- 5. Ver documentos por solicitud (Actualizado a la tabla 'documentos_solicitud')
 SELECT
     s.id_solicitud,
     td.nombre_tipo_documento,
-    d.nombre_archivo,
-    d.estado_validacion,
-    d.comentario_admin,
-    d.fecha_subida
-FROM documento d
-JOIN solicitud s ON d.id_solicitud = s.id_solicitud
-JOIN tipo_documento td ON d.id_tipo_documento = td.id_tipo_documento
-WHERE s.id_solicitud = (
-    SELECT s2.id_solicitud
-    FROM solicitud s2
-    JOIN alumno a ON s2.id_alumno = a.id_alumno
-    WHERE a.numero_cuenta = '20240001'
-    LIMIT 1
-);
+    ds.archivo_path,
+    ds.estado,
+    ds.comentario,
+    ds.fecha_subida
+FROM documentos_solicitud ds
+JOIN solicitud s ON ds.id_solicitud = s.id_solicitud
+JOIN tipo_documento td ON ds.id_tipo_documento = td.id_tipo_documento
+WHERE s.id_solicitud = 1; -- Cambia el 1 por el ID que desees consultar
 
--- Ver historial de solicitudes por alumno
+-- 6. Ver historial de solicitudes por alumno (Incluyendo tipo_tramite)
 SELECT
     a.numero_cuenta,
-    a.nombre,
-    a.apellidos,
     s.id_solicitud,
+    s.tipo_tramite,
     s.fecha_solicitud,
-    s.estado,
-    s.observacion_alumno
+    s.estado
 FROM solicitud s
 JOIN alumno a ON s.id_alumno = a.id_alumno
-WHERE a.numero_cuenta = '20240001'
+WHERE a.numero_cuenta = '2173346'
 ORDER BY s.fecha_solicitud DESC;
 
--- Ver asignaciones activas con alumno y locker
+-- 7. Ver asignaciones activas (Compatible con Locker y Estacionamiento)
 SELECT 
     ag.id_asignacion,
     a.numero_cuenta,
-    a.nombre,
-    a.apellidos,
+    s.tipo_tramite,
     l.codigo_locker,
-    l.ubicacion,
-    ag.fecha_asignacion,
     ag.estado AS estado_asignacion
 FROM asignacion ag
 JOIN solicitud s ON ag.id_solicitud = s.id_solicitud
 JOIN alumno a ON s.id_alumno = a.id_alumno
-JOIN locker l ON ag.id_locker = l.id_locker
+LEFT JOIN locker l ON ag.id_locker = l.id_locker
 WHERE ag.estado = 'ACTIVA'
 ORDER BY ag.fecha_asignacion DESC;
 
--- Ver constancias generadas
+-- 8. Ver constancias generadas
 SELECT
     c.folio,
     c.fecha_generacion,
     a.numero_cuenta,
-    a.nombre,
-    a.apellidos,
-    l.codigo_locker,
-    l.ubicacion
+    s.tipo_tramite
 FROM constancia c
 JOIN asignacion ag ON c.id_asignacion = ag.id_asignacion
 JOIN solicitud s ON ag.id_solicitud = s.id_solicitud
 JOIN alumno a ON s.id_alumno = a.id_alumno
-JOIN locker l ON ag.id_locker = l.id_locker
 ORDER BY c.fecha_generacion DESC;

@@ -1,6 +1,14 @@
---Creamos todas las 9 TABLAS que generamos con sus respectivas entidades y atributos.
+DROP TABLE IF EXISTS constancia CASCADE;
+DROP TABLE IF EXISTS asignacion CASCADE;
+DROP TABLE IF EXISTS revision CASCADE;
+DROP TABLE IF EXISTS documentos_solicitud CASCADE;
+DROP TABLE IF EXISTS solicitud CASCADE;
+DROP TABLE IF EXISTS tipo_documento CASCADE;
+DROP TABLE IF EXISTS locker CASCADE;
+DROP TABLE IF EXISTS admin CASCADE;
+DROP TABLE IF EXISTS alumno CASCADE;
 
---ALUMNO
+-- 1. ALUMNO
 CREATE TABLE alumno (
     id_alumno SERIAL PRIMARY KEY,
     numero_cuenta VARCHAR(20) UNIQUE NOT NULL,
@@ -9,7 +17,7 @@ CREATE TABLE alumno (
     carrera_abreviatura VARCHAR(10) NOT NULL
 );
 
---ADMIN
+-- 2. ADMIN
 CREATE TABLE admin (
     id_admin SERIAL PRIMARY KEY,
     numero_cuenta VARCHAR(20) UNIQUE NOT NULL,
@@ -17,7 +25,7 @@ CREATE TABLE admin (
     apellidos VARCHAR(120) NOT NULL
 );
 
---LOCKER
+-- 3. LOCKER
 CREATE TABLE locker (
     id_locker SERIAL PRIMARY KEY,
     codigo_locker VARCHAR(20) UNIQUE NOT NULL,
@@ -25,17 +33,18 @@ CREATE TABLE locker (
     estado VARCHAR(20) NOT NULL DEFAULT 'DISPONIBLE'
 );
 
---TIPO_DOCUMENTO
+-- 4. TIPO_DOCUMENTO (Catálogo para saber el "tipo")
 CREATE TABLE tipo_documento (
     id_tipo_documento SERIAL PRIMARY KEY,
     nombre_tipo_documento VARCHAR(60) UNIQUE NOT NULL,
     obligatorio BOOLEAN NOT NULL DEFAULT TRUE
 );
 
---SOLICITUD
+-- 5. SOLICITUD
 CREATE TABLE solicitud (
     id_solicitud SERIAL PRIMARY KEY,
     id_alumno INT NOT NULL,
+    tipo_tramite VARCHAR(50) NOT NULL DEFAULT 'locker' CHECK (tipo_tramite IN ('locker', 'estacionamiento')),
     fecha_solicitud TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
     observacion_alumno TEXT,
@@ -44,15 +53,15 @@ CREATE TABLE solicitud (
         REFERENCES alumno(id_alumno)
 );
 
---DOCUMENTO
-CREATE TABLE documento (
+-- 6. DOCUMENTOS_SOLICITUD
+CREATE TABLE documentos_solicitud (
     id_documento SERIAL PRIMARY KEY,
     id_solicitud INT NOT NULL,
-    id_tipo_documento INT NOT NULL,
-    nombre_archivo VARCHAR(150) NOT NULL,
+    id_tipo_documento INT NOT NULL, -- campo "tipo"
+    archivo_path VARCHAR(150) NOT NULL, -- Ruta física de la carpeta uploads
     fecha_subida TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    estado_validacion VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
-    comentario_admin TEXT,
+    estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE', -- Estado de validación del documento
+    comentario TEXT, -- Comentario del admin si se rechaza
     CONSTRAINT fk_documento_solicitud
         FOREIGN KEY (id_solicitud)
         REFERENCES solicitud(id_solicitud),
@@ -63,7 +72,7 @@ CREATE TABLE documento (
         UNIQUE (id_solicitud, id_tipo_documento)
 );
 
---REVISION
+-- 7. REVISION
 CREATE TABLE revision (
     id_revision SERIAL PRIMARY KEY,
     id_solicitud INT NOT NULL,
@@ -79,11 +88,11 @@ CREATE TABLE revision (
         REFERENCES admin(id_admin)
 );
 
---ASIGNACION
+-- 8. ASIGNACION
 CREATE TABLE asignacion (
     id_asignacion SERIAL PRIMARY KEY,
     id_solicitud INT NOT NULL UNIQUE,
-    id_locker INT NOT NULL,
+    id_locker INT, 
     fecha_asignacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVA',
     CONSTRAINT fk_asignacion_solicitud
@@ -94,7 +103,7 @@ CREATE TABLE asignacion (
         REFERENCES locker(id_locker)
 );
 
---CONSTANCIA
+-- 9. CONSTANCIA
 CREATE TABLE constancia (
     id_constancia SERIAL PRIMARY KEY,
     id_asignacion INT NOT NULL UNIQUE,
@@ -105,22 +114,23 @@ CREATE TABLE constancia (
         REFERENCES asignacion(id_asignacion)
 );
 
---REGLAS DE DB con INDEX
 
--- Un alumno no puede tener más de una solicitud activa.
+-- Regla: Un alumno no puede tener más de una solicitud activa del mismo tipo de trámite.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_solicitud_activa_por_alumno
-ON solicitud (id_alumno)
+ON solicitud (id_alumno, tipo_tramite)
 WHERE estado IN ('PENDIENTE', 'EN_REVISION', 'APROBADA');
 
--- Un locker no puede tener más de una asignación activa.
+-- Regla: Un locker no puede tener más de una asignación activa.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_asignacion_activa_por_locker
 ON asignacion (id_locker)
-WHERE estado = 'ACTIVA';
+WHERE estado = 'ACTIVA' AND id_locker IS NOT NULL;
 
---VER TABLAS EXISTENTES
+
+CREATE INDEX IF NOT EXISTS idx_busqueda_solicitud_alumno ON solicitud(id_alumno);
+CREATE INDEX IF NOT EXISTS idx_busqueda_solicitud_estado ON solicitud(estado);
+
+-- VER TABLAS EXISTENTES
 SELECT tablename
 FROM pg_tables
 WHERE schemaname = 'public'
 ORDER BY tablename;
-
-
