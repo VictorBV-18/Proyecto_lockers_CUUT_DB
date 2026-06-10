@@ -1,4 +1,4 @@
-<body>
+<div class="login-page">
   <!-- Decoraciones de fondo -->
   <div class="bg-decor bg-decor--book" aria-hidden="true">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
@@ -7,7 +7,7 @@
       <path d="M12 6.5v12" />
     </svg>
   </div>
- 
+
   <div class="bg-decor bg-decor--badge" aria-hidden="true">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
          stroke-linecap="round" stroke-linejoin="round">
@@ -16,7 +16,7 @@
       <path d="M12 6.5 13 8.6l2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3Z" />
     </svg>
   </div>
- 
+
   <!-- Tarjeta principal -->
   <main class="card">
     <header class="card__brand">
@@ -30,15 +30,15 @@
       <h1 class="logo-title">Portal Estudiantil</h1>
       <p class="logo-subtitle">Centro Universitario UAEMex Tianguistenco</p>
     </header>
- 
+
     <section class="card__welcome">
       <h2 class="welcome-title">Bienvenido al Portal Estudiantil</h2>
       <p class="welcome-text">Ingresa tus credenciales institucionales</p>
     </section>
- 
-    <form class="form" autocomplete="off" onsubmit="return false;">
+
+    <form class="form" autocomplete="off" (ngSubmit)="login()">
       <div class="field">
-        <label for="username" class="field__label">username</label>
+        <label for="username" class="field__label">Número de cuenta</label>
         <div class="input">
           <span class="input__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
@@ -47,10 +47,16 @@
               <path d="m3 6 9 7 9-7" />
             </svg>
           </span>
-          <input id="username" type="text" placeholder="2370616" />
+          <input
+            id="username"
+            type="text"
+            placeholder="2370616"
+            [(ngModel)]="numeroCuenta"
+            name="numeroCuenta"
+          />
         </div>
       </div>
- 
+
       <div class="field">
         <label for="password" class="field__label">Contraseña</label>
         <div class="input">
@@ -61,9 +67,20 @@
               <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" />
             </svg>
           </span>
-          <input id="password" type="password" placeholder="*******" />
-          <button type="button" class="input__toggle" aria-label="Mostrar contraseña"
-                  onclick="togglePassword(this)">
+          <input
+            id="password"
+            [type]="mostrarPassword ? 'text' : 'password'"
+            placeholder="*******"
+            [(ngModel)]="password"
+            name="password"
+          />
+          <button
+            type="button"
+            class="input__toggle"
+            [class.input__toggle--active]="mostrarPassword"
+            aria-label="Mostrar contraseña"
+            (click)="togglePassword()"
+          >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
                  stroke-linecap="round" stroke-linejoin="round">
               <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
@@ -72,10 +89,10 @@
           </button>
         </div>
       </div>
- 
+
       <a href="#" class="forgot">Olvidé mi contraseña</a>
- 
-      <button type="submit" class="btn-login" (click)="login()">
+
+      <button type="submit" class="btn-login">
         <span>Iniciar Sesión</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -85,7 +102,7 @@
         </svg>
       </button>
     </form>
- 
+
     <footer class="card__footer">
       <div class="ssl">
         <span class="ssl__avatar" aria-hidden="true"></span>
@@ -96,16 +113,4 @@
       </div>
     </footer>
   </main>
- 
-  <p class="help">¿Necesitas ayuda? <a href="#">Soporte Técnico</a></p>
- 
-  <script>
-    function togglePassword(btn) {
-      const input = document.getElementById('password');
-      const isHidden = input.type === 'password';
-      input.type = isHidden ? 'text' : 'password';
-      btn.setAttribute('aria-label', isHidden ? 'Ocultar contraseña' : 'Mostrar contraseña');
-      btn.classList.toggle('input__toggle--active', isHidden);
-    }
-  </script>
-</body>
+</div>
