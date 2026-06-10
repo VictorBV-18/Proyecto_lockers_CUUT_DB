@@ -1,0 +1,62 @@
+<div class="app-layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <div class="brand-logo">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 10 12 5 2 10l10 5 10-5Z"/>
+            <path d="M6 12v5c0 1 2.7 2.5 6 2.5s6-1.5 6-2.5v-5"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-name">Portal CUUT</div>
+          <div class="brand-sub">UAEMex Tianguistenco</div>
+        </div>
+      </div>
+
+      <div class="user-badge">
+        <div class="user-avatar">{{ userInitials }}</div>
+        <div class="user-info">
+          <div class="user-account">{{ userAccount }}</div>
+          <div class="user-role">{{ getRoleLabel() }}</div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="sidebar__nav">
+      <div class="nav-section-label">Menú</div>
+
+      <button
+        *ngFor="let item of menuItems"
+        class="nav-item"
+        [class.active]="isActive(item.route)"
+        (click)="navigate(item.route)"
+      >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path [attr.d]="getIconPath(item.icon)"></path>
+        </svg>
+        <span>{{ item.label }}</span>
+      </button>
+    </nav>
+
+    <div class="sidebar__footer">
+      <button class="btn-logout" (click)="logout()">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path [attr.d]="getIconPath('logout')"></path>
+        </svg>
+        <span>Cerrar sesión</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Contenido principal -->
+  <main class="main-content">
+    <router-outlet></router-outlet>
+  </main>
+
+</div>
