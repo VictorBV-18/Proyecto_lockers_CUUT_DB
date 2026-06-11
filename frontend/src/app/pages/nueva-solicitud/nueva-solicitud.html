@@ -1,10 +1,235 @@
-<div class="page-header">
-  <h1 class="page-title">Nueva Solicitud</h1>
-  <p class="page-desc">Crea una nueva solicitud de locker o estacionamiento.</p>
+<div class="breadcrumb">
+  <a>Trámites</a>
+  <span class="crumb-sep">›</span>
+  <span class="crumb-current">Nueva Solicitud</span>
 </div>
-<div class="empty-card">
-  <div class="empty-icon">➕</div>
-  <p class="empty-title">Formulario de solicitud</p>
-  <p class="empty-text">Esta sección está en desarrollo.</p>
+<h1 class="page-title">Generar Nueva Solicitud Académica</h1>
+<p class="page-desc">
+  Complete los siguientes campos para iniciar su trámite. Asegúrese de adjuntar la
+  documentación necesaria para agilizar el proceso de revisión.
+</p>
+
+<div class="layout-grid">
+
+  <div>
+    <div class="card">
+      <div class="card-label">Tipo de Solicitud</div>
+      <div class="select-wrapper">
+        <select
+          class="select-field"
+          [class.placeholder]="tipoSolicitud === ''"
+          [(ngModel)]="tipoSolicitud"
+          (ngModelChange)="onTipoChange()"
+          name="tipoSolicitud"
+        >
+          <option value="" disabled>Seleccione una opción</option>
+          <option value="estacionamiento" [disabled]="hayEstacionamientoActiva">
+            Gestión de Permiso de Estacionamiento{{ hayEstacionamientoActiva ? ' — ya tienes una en revisión' : '' }}
+          </option>
+          <option value="locker" [disabled]="hayLockerActivo">
+            Gestión para la obtención de locker{{ hayLockerActivo ? ' — ya tienes una en revisión' : '' }}
+          </option>
+        </select>
+        <svg class="select-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m6 9 6 6 6-6"/>
+        </svg>
+      </div>
+    </div>
+
+    <ng-container *ngIf="tipoSolicitud !== ''; else emptyTpl">
+      <div class="card fade-in">
+        <div class="docs-card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+          </svg>
+          Documentación de Respaldo
+        </div>
+        <p class="docs-card-sub">
+          Por favor, adjunte los siguientes documentos obligatorios para
+          {{ tipoSolicitud === 'estacionamiento' ? 'el Permiso de Estacionamiento' : 'la obtención de Locker' }}:
+        </p>
+
+        <div class="doc-list">
+          <div
+            *ngFor="let doc of documentos; let i = index"
+            class="doc-item"
+            [class.ready]="doc.archivo"
+            [class.has-error]="doc.error"
+          >
+            <div class="doc-icon-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path [attr.d]="getDocIcon(doc.id)"></path>
+              </svg>
+            </div>
+            <div class="doc-info">
+              <div class="doc-name">{{ doc.nombre }}</div>
+              <div class="doc-meta">{{ doc.formatos }}</div>
+
+              <div class="doc-attached" *ngIf="doc.archivo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 6 9 17l-5-5"/>
+                </svg>
+                {{ doc.archivo.name }} · {{ formatBytes(doc.archivo.size) }}
+                <button class="rm" type="button" (click)="removeFile(i)">quitar</button>
+              </div>
+
+              <div class="doc-error" *ngIf="doc.error">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                {{ doc.error }}
+              </div>
+            </div>
+
+            <label class="btn-adjuntar" [class.swap]="doc.archivo">
+              <input
+                type="file"
+                hidden
+                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                (change)="onFileSelected($event, i)"
+              />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+              </svg>
+              {{ doc.archivo ? 'Reemplazar' : 'Adjuntar archivo' }}
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions fade-in">
+        <button class="btn btn-secondary" type="button" (click)="guardarBorrador()">
+          Guardar Borrador
+        </button>
+        <button
+          class="btn btn-primary"
+          type="button"
+          [disabled]="!todosDocumentosListos() || enviando"
+          (click)="enviarSolicitud()"
+        >
+          {{ enviando ? 'Enviando...' : 'Enviar Solicitud' }}
+          <svg *ngIf="!enviando" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M13 6l6 6-6 6"/>
+          </svg>
+        </button>
+      </div>
+    </ng-container>
+
+    <ng-template #emptyTpl>
+      <div class="empty-state fade-in">
+        <div class="icon-circle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <path d="M14 2v6h6M12 12v6M9 15h6"/>
+          </svg>
+        </div>
+        <p class="empty-title">Selecciona un tipo de trámite</p>
+        <p class="empty-text">
+          Elige una opción del selector superior para ver los documentos requeridos.
+        </p>
+      </div>
+    </ng-template>
+  </div>
+
+  <aside class="side-panel">
+    <div class="info-card-dark">
+      <h3>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        Guía de Seguridad
+      </h3>
+      <ul class="check-list">
+        <li>
+          <span class="check">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6 9 17l-5-5"/>
+            </svg>
+          </span>
+          Verifique que sus datos personales estén actualizados antes de enviar.
+        </li>
+        <li>
+          <span class="check">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6 9 17l-5-5"/>
+            </svg>
+          </span>
+          Los documentos PDF deben estar sin protección por contraseña.
+        </li>
+        <li>
+          <span class="check">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6 9 17l-5-5"/>
+            </svg>
+          </span>
+          Cada archivo no debe exceder los 5MB de tamaño.
+        </li>
+      </ul>
+    </div>
+
+    <div class="info-card-warn" title="No se permiten dos solicitudes activas del mismo tipo">
+      <h4>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+        Notas Importantes
+      </h4>
+      <p>
+        No se permiten <strong>dos solicitudes activas del mismo tipo</strong>. Si ya tienes
+        una solicitud en revisión, deberás esperar la resolución antes de generar otra.
+      </p>
+    </div>
+
+    <div class="info-card-time">
+      <h4>Tiempos de Respuesta</h4>
+      <div class="time-row">
+        <span class="label">Revisión Inicial</span>
+        <span class="value">24 hrs</span>
+      </div>
+      <div class="time-row">
+        <span class="label">Trámite Ordinario</span>
+        <span class="value">3–5 días hábiles</span>
+      </div>
+      <div class="time-row">
+        <span class="label">Urgencias</span>
+        <span class="value">Previa validación</span>
+      </div>
+    </div>
+  </aside>
+
 </div>
 
+<section class="history-section">
+  <h2 class="history-title">Mis Solicitudes Recientes</h2>
+  <div class="history-list">
+    <div *ngFor="let s of historial" class="history-item">
+      <div class="history-info">
+        <div class="history-tipo">{{ s.tipo }}</div>
+        <div class="history-meta">
+          <span class="folio">{{ s.folio }}</span> · {{ s.fecha }}
+        </div>
+      </div>
+      <span class="badge" [ngClass]="'badge--' + s.estado">
+        <span class="badge-dot"></span>
+        {{ getEstadoLabel(s.estado) }}
+      </span>
+    </div>
+  </div>
+</section>
