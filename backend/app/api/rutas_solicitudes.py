@@ -11,18 +11,22 @@ CARPETA_UPLOADS = "uploads"
 if not os.path.exists(CARPETA_UPLOADS):
     os.makedirs(CARPETA_UPLOADS)
 
-#  ESQUEMA DE DATOS 
+
+# ESQUEMAS DE DATOS
 class SolicitudCrear(BaseModel):
     numero_cuenta: str
-    tipo_tramite: str # Recibe 'locker' o 'estacionamiento' de frontend
-# 
+    tipo_tramite: str # Se recibe locker o estacionamiento del frontend
+    observacion: str | None = None 
+
 class ActualizarEstadoSolicitud(BaseModel):
     estado: str
     comentario: str | None = None
 
 
 
-# CREAR SOLICITUD
+# ENDPOINTS ALUMNO
+
+# Crear solicitud
 @router.post("/solicitudes/")
 def crear_solicitud(solicitud: SolicitudCrear):
     tramite = solicitud.tipo_tramite.lower()
@@ -36,7 +40,7 @@ def crear_solicitud(solicitud: SolicitudCrear):
     try:
         cursor = conexion.cursor()
 
-        # Buscar el id_alumno usando el numero_cuenta
+        # Se busca el id_alumno usando el numero_cuenta
         cursor.execute("SELECT id_alumno FROM alumno WHERE numero_cuenta = %s", (solicitud.numero_cuenta,))
         alumno_bd = cursor.fetchone()
         
@@ -47,7 +51,7 @@ def crear_solicitud(solicitud: SolicitudCrear):
             
         id_alumno_real = alumno_bd[0]
 
-        # Validar si ya tiene una solicitud pendiente o aprobada del mismo trámite
+        # Se validar si ya tiene una solicitud pendiente o aprobada
         cursor.execute(
             """
             SELECT id_solicitud FROM solicitud 
@@ -62,13 +66,13 @@ def crear_solicitud(solicitud: SolicitudCrear):
             conexion.close()
             raise HTTPException(status_code=400, detail=f"Ya tienes una solicitud de {tramite} en proceso.")
 
-        # Insertar la nueva solicitud incluyendo el tipo de trámite
+        # Se crea la nueva solicitud
         cursor.execute(
             """
-            INSERT INTO solicitud (id_alumno, tipo_tramite, estado) 
-            VALUES (%s, %s, 'PENDIENTE') RETURNING id_solicitud
+            INSERT INTO solicitud (id_alumno, tipo_tramite, estado, observacion_alumno) 
+            VALUES (%s, %s, 'PENDIENTE', %s) RETURNING id_solicitud
             """,
-            (id_alumno_real, tramite)
+            (id_alumno_real, tramite, solicitud.observacion)
         )
         nueva_solicitud = cursor.fetchone()
         conexion.commit()
@@ -80,7 +84,8 @@ def crear_solicitud(solicitud: SolicitudCrear):
 
         return {
             "mensaje": f"Solicitud de {tramite} creada con éxito.",
-            "id_solicitud": id_generado
+            "id_solicitud": id_generado,
+            "observacion_registrada": solicitud.observacion
         }
 
     except HTTPException:
@@ -91,14 +96,14 @@ def crear_solicitud(solicitud: SolicitudCrear):
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
-# SUBIR DOCUMENTO 
+# Subir documentos 
 @router.post("/solicitudes/{id_solicitud}/documentos/")
 async def subir_documento(
     id_solicitud: int, 
-    id_tipo_documento: int = Form(1), # Consulta en el catálogo de la base de datos (1: INE, 2: Tira, etc.)
+    id_tipo_documento: int = Form(...), # Consulta en el catálogo de BD (1: INE, 2: Tira, etc.)
     archivo: UploadFile = File(...)
 ):
-    # Validar extensión
+    # Validar formato
     extensiones_permitidas = ["pdf", "jpg", "jpeg", "png"]
     extension = archivo.filename.split(".")[-1].lower()
     
@@ -112,21 +117,19 @@ async def subir_documento(
     
     await archivo.seek(0)
 
-    # Guardado físico
+    # Guardado en la carpeta
     nombre_seguro = f"solicitud_{id_solicitud}_{archivo.filename}"
     ruta_guardado = os.path.join(CARPETA_UPLOADS, nombre_seguro)
 
     with open(ruta_guardado, "wb") as buffer:
         shutil.copyfileobj(archivo.file, buffer)
 
-    # Guardado en BD unificado con la ruta de trabajo
     conexion = conectar_base()
     if conexion is None:
         raise HTTPException(status_code=500, detail="Error en la base de datos")
 
     try:
         cursor = conexion.cursor()
-        # Se apunta a la tabla 'documentos_solicitud' y las columnas 'archivo_path' y 'estado'
         query_doc = """
             INSERT INTO documentos_solicitud (id_solicitud, id_tipo_documento, archivo_path, estado) 
             VALUES (%s, %s, %s, 'PENDIENTE')
@@ -145,11 +148,7 @@ async def subir_documento(
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error al guardar en BD: {str(e)}")
     
-
-##############################################################
-###########Cambios Agregados Vic##############################
-
-# CONSULTAR SOLICITUDES POR NUMERO DE CUENTA
+# Consiltar solicitudes por numero de cuenta (codigo vic)
 @router.get("/solicitudes/{numero_cuenta}")
 def consultar_solicitudes_por_alumno(numero_cuenta: str):
     conexion = conectar_base()
@@ -183,8 +182,10 @@ def consultar_solicitudes_por_alumno(numero_cuenta: str):
                 s.id_solicitud,
                 s.tipo_tramite,
                 s.estado AS estado_solicitud,
+                s.observacion_alumno,
                 ds.id_tipo_documento,
-                ds.archivo_path
+                ds.archivo_path,
+                ds.comentario
             FROM solicitud s
             LEFT JOIN documentos_solicitud ds
                 ON s.id_solicitud = ds.id_solicitud
@@ -195,7 +196,6 @@ def consultar_solicitudes_por_alumno(numero_cuenta: str):
         )
 
         filas = cursor.fetchall()
-
         solicitudes = []
 
         for fila in filas:
@@ -203,8 +203,10 @@ def consultar_solicitudes_por_alumno(numero_cuenta: str):
                 "id_solicitud": fila[0],
                 "tipo_tramite": fila[1],
                 "estado_solicitud": fila[2],
-                "id_tipo_documento": fila[3],
-                "archivo": fila[4]
+                "observacion_alumno": fila[3],
+                "id_tipo_documento": fila[4],
+                "archivo": fila[5],
+                "comentario_admin": fila[6] 
             })
 
         cursor.close()
@@ -222,14 +224,24 @@ def consultar_solicitudes_por_alumno(numero_cuenta: str):
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
     
-######################################################################################################
-############################# CAMBIOS AGREGADOS DIEGO#################################################
 
+# ENDPOINTS ADMINISTRADOR
+
+
+# Actualizar estado de la solicitud (Codigo de Diego)
 @router.put("/solicitudes/{id_solicitud}/estado")
 def actualizar_estado_solicitud(
     id_solicitud: int,
     datos: ActualizarEstadoSolicitud
 ):
+    # Si es incorrecto tiene que mandar comentario obligatoriamente 
+    if datos.estado.upper() == "DOCUMENTACION_INCORRECTA":
+        if not datos.comentario or datos.comentario.strip() == "":
+            raise HTTPException(
+                status_code=400,
+                detail="Debe proporcionar un comentario cuando la documentación es incorrecta"
+            )
+
     conexion = conectar_base()
 
     if conexion is None:
@@ -256,7 +268,6 @@ def actualizar_estado_solicitud(
         if not solicitud:
             cursor.close()
             conexion.close()
-
             raise HTTPException(
                 status_code=404,
                 detail="Solicitud no encontrada"
@@ -272,26 +283,15 @@ def actualizar_estado_solicitud(
             (datos.estado, id_solicitud)
         )
 
-        # Si la documentación es incorrecta guardar comentario
-        if datos.estado.upper() == "DOCUMENTACION_INCORRECTA":
-
-            if not datos.comentario:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Debe proporcionar un comentario"
-                )
-
-            cursor.execute(
-                """
-                UPDATE documentos_solicitud
-                SET comentario = %s
-                WHERE id_solicitud = %s
-                """,
-                (
-                    datos.comentario,
-                    id_solicitud
-                )
-            )
+        # Actualizar estado y comentario de los documentos 
+        cursor.execute(
+            """
+            UPDATE documentos_solicitud
+            SET estado = %s, comentario = %s
+            WHERE id_solicitud = %s
+            """,
+            (datos.estado, datos.comentario, id_solicitud)
+        )
 
         conexion.commit()
 
@@ -299,19 +299,18 @@ def actualizar_estado_solicitud(
         conexion.close()
 
         return {
-            "mensaje": "Estado actualizado correctamente",
+            "mensaje": "Estado actualizado correctamente en sistema y documentos",
             "id_solicitud": id_solicitud,
-            "estado": datos.estado
+            "estado_nuevo": datos.estado,
+            "comentario_guardado": datos.comentario
         }
 
     except HTTPException:
         raise
-
     except Exception as e:
         if conexion:
             conexion.rollback()
             conexion.close()
-
         raise HTTPException(
             status_code=500,
             detail=f"Error en BD: {str(e)}"

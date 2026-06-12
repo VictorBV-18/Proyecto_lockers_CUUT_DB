@@ -30,7 +30,7 @@ CREATE TABLE locker (
     id_locker SERIAL PRIMARY KEY,
     codigo_locker VARCHAR(20) UNIQUE NOT NULL,
     ubicacion VARCHAR(120) NOT NULL,
-    estado VARCHAR(20) NOT NULL DEFAULT 'DISPONIBLE'
+    estado VARCHAR(30) NOT NULL DEFAULT 'DISPONIBLE'
 );
 
 -- 4. TIPO_DOCUMENTO (Catálogo para saber el "tipo")
@@ -46,7 +46,7 @@ CREATE TABLE solicitud (
     id_alumno INT NOT NULL,
     tipo_tramite VARCHAR(50) NOT NULL DEFAULT 'locker' CHECK (tipo_tramite IN ('locker', 'estacionamiento')),
     fecha_solicitud TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
+    estado VARCHAR(30) NOT NULL DEFAULT 'PENDIENTE',
     observacion_alumno TEXT,
     CONSTRAINT fk_solicitud_alumno
         FOREIGN KEY (id_alumno)
@@ -60,7 +60,7 @@ CREATE TABLE documentos_solicitud (
     id_tipo_documento INT NOT NULL, -- campo "tipo"
     archivo_path VARCHAR(150) NOT NULL, -- Ruta física de la carpeta uploads
     fecha_subida TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE', -- Estado de validación del documento
+    estado VARCHAR(30) NOT NULL DEFAULT 'PENDIENTE', -- Estado de validación del documento
     comentario TEXT, -- Comentario del admin si se rechaza
     CONSTRAINT fk_documento_solicitud
         FOREIGN KEY (id_solicitud)
@@ -94,7 +94,7 @@ CREATE TABLE asignacion (
     id_solicitud INT NOT NULL UNIQUE,
     id_locker INT, 
     fecha_asignacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVA',
+    estado VARCHAR(30) NOT NULL DEFAULT 'ACTIVA',
     CONSTRAINT fk_asignacion_solicitud
         FOREIGN KEY (id_solicitud)
         REFERENCES solicitud(id_solicitud),
@@ -118,7 +118,7 @@ CREATE TABLE constancia (
 -- Regla: Un alumno no puede tener más de una solicitud activa del mismo tipo de trámite.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_solicitud_activa_por_alumno
 ON solicitud (id_alumno, tipo_tramite)
-WHERE estado IN ('PENDIENTE', 'EN_REVISION', 'APROBADA');
+WHERE estado IN ('PENDIENTE', 'EN_REVISION', 'APROBADA', 'DOCUMENTACION_INCORRECTA');
 
 -- Regla: Un locker no puede tener más de una asignación activa.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_asignacion_activa_por_locker
