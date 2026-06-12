@@ -15,6 +15,12 @@ if not os.path.exists(CARPETA_UPLOADS):
 class SolicitudCrear(BaseModel):
     numero_cuenta: str
     tipo_tramite: str # Recibe 'locker' o 'estacionamiento' de frontend
+# 
+class ActualizarEstadoSolicitud(BaseModel):
+    estado: str
+    comentario: str | None = None
+
+
 
 # CREAR SOLICITUD
 @router.post("/solicitudes/")
@@ -215,3 +221,98 @@ def consultar_solicitudes_por_alumno(numero_cuenta: str):
         if conexion:
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+    
+######################################################################################################
+############################# CAMBIOS AGREGADOS DIEGO#################################################
+
+@router.put("/solicitudes/{id_solicitud}/estado")
+def actualizar_estado_solicitud(
+    id_solicitud: int,
+    datos: ActualizarEstadoSolicitud
+):
+    conexion = conectar_base()
+
+    if conexion is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Error de conexión a la BD"
+        )
+
+    try:
+        cursor = conexion.cursor()
+
+        # Verificar que exista la solicitud
+        cursor.execute(
+            """
+            SELECT id_solicitud
+            FROM solicitud
+            WHERE id_solicitud = %s
+            """,
+            (id_solicitud,)
+        )
+
+        solicitud = cursor.fetchone()
+
+        if not solicitud:
+            cursor.close()
+            conexion.close()
+
+            raise HTTPException(
+                status_code=404,
+                detail="Solicitud no encontrada"
+            )
+
+        # Actualizar estado de la solicitud
+        cursor.execute(
+            """
+            UPDATE solicitud
+            SET estado = %s
+            WHERE id_solicitud = %s
+            """,
+            (datos.estado, id_solicitud)
+        )
+
+        # Si la documentación es incorrecta guardar comentario
+        if datos.estado.upper() == "DOCUMENTACION_INCORRECTA":
+
+            if not datos.comentario:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Debe proporcionar un comentario"
+                )
+
+            cursor.execute(
+                """
+                UPDATE documentos_solicitud
+                SET comentario = %s
+                WHERE id_solicitud = %s
+                """,
+                (
+                    datos.comentario,
+                    id_solicitud
+                )
+            )
+
+        conexion.commit()
+
+        cursor.close()
+        conexion.close()
+
+        return {
+            "mensaje": "Estado actualizado correctamente",
+            "id_solicitud": id_solicitud,
+            "estado": datos.estado
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+            conexion.close()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error en BD: {str(e)}"
+        )
