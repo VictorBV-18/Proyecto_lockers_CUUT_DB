@@ -1,6 +1,8 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from pydantic import BaseModel
 from app.db.conexion import conectar_base
+from app.utils.notificaciones import enviar_correo_rechazo 
+from enum import Enum 
 import shutil
 import os
 
@@ -12,22 +14,38 @@ if not os.path.exists(CARPETA_UPLOADS):
     os.makedirs(CARPETA_UPLOADS)
 
 
-# ESQUEMAS DE DATOS
+
+
+
+# Catalogos y esquema de datos
+class OpcionesEstadoDocumento(str, Enum):
+    APROBADO = "APROBADO"
+    RECHAZADO = "RECHAZADO"
+
 class SolicitudCrear(BaseModel):
     numero_cuenta: str
-    tipo_tramite: str # Se recibe locker o estacionamiento del frontend
+    tipo_tramite: str 
     observacion: str | None = None 
+    correo_electronico: str 
 
-class ActualizarEstadoSolicitud(BaseModel):
-    estado: str
+class ActualizarEstadoDocumento(BaseModel):
+    id_admin: int 
+    estado: OpcionesEstadoDocumento
     comentario: str | None = None
 
+class RechazarSolicitud(BaseModel): 
+    id_admin: int
+    motivo: str
 
 
+
+
+# - - - - - - - - - - - - 
 # ENDPOINTS ALUMNO
+# - - - - - - - - - - - - 
 
-# Crear solicitud
-@router.post("/solicitudes/")
+# Endpoint - Crear nueva solicitud
+@router.post("/solicitudes/", tags=["Alumno"], summary="Crear una nueva solicitud de trámite")
 def crear_solicitud(solicitud: SolicitudCrear):
     tramite = solicitud.tipo_tramite.lower()
     if tramite not in ["locker", "estacionamiento"]:
@@ -40,7 +58,7 @@ def crear_solicitud(solicitud: SolicitudCrear):
     try:
         cursor = conexion.cursor()
 
-        # Se busca el id_alumno usando el numero_cuenta
+        # Buscar el ID del alumno
         cursor.execute("SELECT id_alumno FROM alumno WHERE numero_cuenta = %s", (solicitud.numero_cuenta,))
         alumno_bd = cursor.fetchone()
         
@@ -51,7 +69,13 @@ def crear_solicitud(solicitud: SolicitudCrear):
             
         id_alumno_real = alumno_bd[0]
 
-        # Se validar si ya tiene una solicitud pendiente o aprobada
+        # Actualizar el correo electrónico del alumno
+        cursor.execute(
+            "UPDATE alumno SET correo_electronico = %s WHERE id_alumno = %s", 
+            (solicitud.correo_electronico, id_alumno_real)
+        )
+
+        # Validar si ya cuenta con una solicitud activa
         cursor.execute(
             """
             SELECT id_solicitud FROM solicitud 
@@ -66,7 +90,7 @@ def crear_solicitud(solicitud: SolicitudCrear):
             conexion.close()
             raise HTTPException(status_code=400, detail=f"Ya tienes una solicitud de {tramite} en proceso.")
 
-        # Se crea la nueva solicitud
+        # Insertar nueva solicitud principal
         cursor.execute(
             """
             INSERT INTO solicitud (id_alumno, tipo_tramite, estado, observacion_alumno) 
@@ -75,17 +99,23 @@ def crear_solicitud(solicitud: SolicitudCrear):
             (id_alumno_real, tramite, solicitud.observacion)
         )
         nueva_solicitud = cursor.fetchone()
-        conexion.commit()
-        
         id_generado = nueva_solicitud[0]
-        
+
+        # notifica al personal sobre el nuevo tramite realizado
+        cursor.execute("""
+            INSERT INTO notificaciones (rol_destino, titulo, mensaje)
+            VALUES ('REVISOR', 'Nueva Solicitud Recibida', %s)
+        """, (f"El alumno con cuenta {solicitud.numero_cuenta} ha iniciado un trámite de {tramite}.",))
+
+        conexion.commit()
         cursor.close()
         conexion.close()
 
         return {
             "mensaje": f"Solicitud de {tramite} creada con éxito.",
             "id_solicitud": id_generado,
-            "observacion_registrada": solicitud.observacion
+            "observacion_registrada": solicitud.observacion,
+            "correo_actualizado": solicitud.correo_electronico
         }
 
     except HTTPException:
@@ -96,28 +126,29 @@ def crear_solicitud(solicitud: SolicitudCrear):
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
-# Subir documentos 
-@router.post("/solicitudes/{id_solicitud}/documentos/")
+
+
+
+
+# Endpoint - Subida de documentos por tramite
+@router.post("/solicitudes/{id_solicitud}/documentos/", tags=["Alumno"], summary="Subir un documento a la solicitud")
 async def subir_documento(
     id_solicitud: int, 
-    id_tipo_documento: int = Form(...), # Consulta en el catálogo de BD (1: INE, 2: Tira, etc.)
+    id_tipo_documento: int = Form(...), 
     archivo: UploadFile = File(...)
 ):
-    # Validar formato
     extensiones_permitidas = ["pdf", "jpg", "jpeg", "png"]
     extension = archivo.filename.split(".")[-1].lower()
     
     if extension not in extensiones_permitidas:
         raise HTTPException(status_code=400, detail="Formato no permitido. Solo PDF, JPG o PNG.")
 
-    # Validar peso (5MB)
     contenido = await archivo.read()
     if len(contenido) > 5242880:
         raise HTTPException(status_code=400, detail="El archivo es demasiado pesado. Máximo 5MB.")
     
     await archivo.seek(0)
 
-    # Guardado en la carpeta
     nombre_seguro = f"solicitud_{id_solicitud}_{archivo.filename}"
     ruta_guardado = os.path.join(CARPETA_UPLOADS, nombre_seguro)
 
@@ -130,11 +161,28 @@ async def subir_documento(
 
     try:
         cursor = conexion.cursor()
+        
+        # Insertar el registro del documento individual
         query_doc = """
             INSERT INTO documentos_solicitud (id_solicitud, id_tipo_documento, archivo_path, estado) 
             VALUES (%s, %s, %s, 'PENDIENTE')
         """
         cursor.execute(query_doc, (id_solicitud, id_tipo_documento, nombre_seguro))
+        
+    
+
+        # Notificacion para obtener datos de la cuenta para avisar al personal que corrigio los documentos
+        cursor.execute("""
+            SELECT a.numero_cuenta, s.tipo_tramite FROM solicitud s
+            JOIN alumno a ON s.id_alumno = a.id_alumno WHERE s.id_solicitud = %s
+        """, (id_solicitud,))
+        info_solicitud = cursor.fetchone()
+        
+        if info_solicitud:
+            cursor.execute("""
+                INSERT INTO notificaciones (rol_destino, titulo, mensaje)
+                VALUES ('REVISOR', 'Documento Actualizado', %s)
+            """, (f"La solicitud ID {id_solicitud} ({info_solicitud[1]}) de la cuenta {info_solicitud[0]} recibió un nuevo archivo.",))
         
         conexion.commit()
         cursor.close()
@@ -148,25 +196,21 @@ async def subir_documento(
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error al guardar en BD: {str(e)}")
     
-# Consiltar solicitudes por numero de cuenta (codigo vic)
-@router.get("/solicitudes/{numero_cuenta}")
+
+
+
+
+# Endpoint - Consultar historial de solicitudes por numero de cuenta
+@router.get("/solicitudes/{numero_cuenta}", tags=["Alumno"], summary="Consultar historial de solicitudes por alumno")
 def consultar_solicitudes_por_alumno(numero_cuenta: str):
     conexion = conectar_base()
-
     if conexion is None:
         raise HTTPException(status_code=500, detail="Error de conexión a la BD")
 
     try:
         cursor = conexion.cursor()
 
-        cursor.execute(
-            """
-            SELECT id_alumno
-            FROM alumno
-            WHERE numero_cuenta = %s
-            """,
-            (numero_cuenta,)
-        )
+        cursor.execute("SELECT id_alumno FROM alumno WHERE numero_cuenta = %s", (numero_cuenta,))
         alumno = cursor.fetchone()
 
         if not alumno:
@@ -185,10 +229,11 @@ def consultar_solicitudes_por_alumno(numero_cuenta: str):
                 s.observacion_alumno,
                 ds.id_tipo_documento,
                 ds.archivo_path,
-                ds.comentario
+                ds.comentario,
+                ds.estado AS estado_documento,
+                ds.id_documento
             FROM solicitud s
-            LEFT JOIN documentos_solicitud ds
-                ON s.id_solicitud = ds.id_solicitud
+            LEFT JOIN documentos_solicitud ds ON s.id_solicitud = ds.id_solicitud
             WHERE s.id_alumno = %s
             ORDER BY s.id_solicitud, ds.id_tipo_documento
             """,
@@ -206,7 +251,9 @@ def consultar_solicitudes_por_alumno(numero_cuenta: str):
                 "observacion_alumno": fila[3],
                 "id_tipo_documento": fila[4],
                 "archivo": fila[5],
-                "comentario_admin": fila[6] 
+                "comentario_admin": fila[6],
+                "estado_documento": fila[7],
+                "id_documento": fila[8]
             })
 
         cursor.close()
@@ -217,92 +264,172 @@ def consultar_solicitudes_por_alumno(numero_cuenta: str):
             "solicitudes": solicitudes
         }
 
-    except HTTPException:
-        raise
     except Exception as e:
         if conexion:
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
-    
 
+
+
+
+# - - - - - - - - - - - - 
 # ENDPOINTS ADMINISTRADOR
+# - - - - - - - - - - - - 
 
-
-# Actualizar estado de la solicitud (Codigo de Diego)
-@router.put("/solicitudes/{id_solicitud}/estado")
-def actualizar_estado_solicitud(
-    id_solicitud: int,
-    datos: ActualizarEstadoSolicitud
+# Endpoint - Visualiazr todas las solicitudes creadas por todos los alumnos
+@router.get("/solicitudes/", tags=["Administrador / Personal"], summary="Obtener todas las solicitudes de los alumnos (Tabla principal)")
+def obtener_todas_las_solicitudes(
+    tipo_tramite: str | None = None, 
+    estado: str | None = None, 
+    fecha: str | None = None
 ):
-    # Si es incorrecto tiene que mandar comentario obligatoriamente 
-    if datos.estado.upper() == "DOCUMENTACION_INCORRECTA":
-        if not datos.comentario or datos.comentario.strip() == "":
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+        
+        # Construcción dinámica de la consulta con filtros
+        query = """
+            SELECT 
+                s.id_solicitud,
+                a.numero_cuenta,
+                a.nombre,
+                a.apellidos,
+                s.tipo_tramite,
+                s.fecha_solicitud,
+                s.estado
+            FROM solicitud s
+            JOIN alumno a ON s.id_alumno = a.id_alumno
+            WHERE 1=1
+        """
+        parametros = []
+
+        if tipo_tramite:
+            query += " AND s.tipo_tramite = %s"
+            parametros.append(tipo_tramite.lower())
+            
+        if estado:
+            query += " AND s.estado = %s"
+            parametros.append(estado.upper())
+            
+        if fecha:
+            # formato YYYY-MM-DD parte que se espera del frontend
+            query += " AND DATE(s.fecha_solicitud) = %s"
+            parametros.append(fecha)
+
+        query += " ORDER BY s.fecha_solicitud DESC"
+
+        cursor.execute(query, tuple(parametros))
+        
+        filas = cursor.fetchall()
+        solicitudes = []
+
+        for fila in filas:
+            solicitudes.append({
+                "id_solicitud": fila[0],
+                "folio": f"FOL-{fila[0]:04d}", 
+                "numero_cuenta": fila[1],
+                "nombre_completo": f"{fila[2]} {fila[3]}",
+                "tipo_tramite": fila[4],
+                "fecha_solicitud": fila[5],
+                "estado": fila[6]
+            })
+
+        cursor.close()
+        conexion.close()
+        return {"solicitudes": solicitudes}
+
+    except Exception as e:
+        if conexion:
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+
+
+
+
+# Endpoint - Aceptar o Rechazar documento individualmente depende de lo que el personal reivse
+@router.put("/solicitudes/{id_solicitud}/documentos/{id_documento}", tags=["Administrador / Personal"], summary="Evaluar documento individual")
+def evaluar_documento_individual(
+    id_solicitud: int,
+    id_documento: int,
+    datos: ActualizarEstadoDocumento
+):
+    estado_texto = datos.estado.value 
+    comentario_final = datos.comentario
+
+    if estado_texto == "RECHAZADO":
+        if not comentario_final or comentario_final.strip() == "":
             raise HTTPException(
                 status_code=400,
-                detail="Debe proporcionar un comentario cuando la documentación es incorrecta"
+                detail="Debe proporcionar un comentario explicando por qué se rechaza el documento."
             )
+    elif estado_texto == "APROBADO":
+        comentario_final = None
 
     conexion = conectar_base()
-
     if conexion is None:
-        raise HTTPException(
-            status_code=500,
-            detail="Error de conexión a la BD"
-        )
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
 
     try:
         cursor = conexion.cursor()
 
-        # Verificar que exista la solicitud
-        cursor.execute(
-            """
-            SELECT id_solicitud
-            FROM solicitud
-            WHERE id_solicitud = %s
-            """,
-            (id_solicitud,)
-        )
+        # Validar existencia de la relación del documento
+        cursor.execute("""
+            SELECT id_documento FROM documentos_solicitud
+            WHERE id_solicitud = %s AND id_documento = %s
+        """, (id_solicitud, id_documento))
 
-        solicitud = cursor.fetchone()
-
-        if not solicitud:
+        if not cursor.fetchone():
             cursor.close()
             conexion.close()
-            raise HTTPException(
-                status_code=404,
-                detail="Solicitud no encontrada"
-            )
+            raise HTTPException(status_code=404, detail="Documento no encontrado o no pertenece a la solicitud.")
 
-        # Actualizar estado de la solicitud
-        cursor.execute(
-            """
-            UPDATE solicitud
-            SET estado = %s
-            WHERE id_solicitud = %s
-            """,
-            (datos.estado, id_solicitud)
-        )
-
-        # Actualizar estado y comentario de los documentos 
-        cursor.execute(
-            """
+        # Actualizar estado del documento específico
+        cursor.execute("""
             UPDATE documentos_solicitud
             SET estado = %s, comentario = %s
-            WHERE id_solicitud = %s
-            """,
-            (datos.estado, datos.comentario, id_solicitud)
-        )
+            WHERE id_solicitud = %s AND id_documento = %s
+        """, (estado_texto, comentario_final, id_solicitud, id_documento))
+
+        # Registrar huella básica de quién se encuentra auditando el trámite
+        cursor.execute("""
+            UPDATE solicitud
+            SET revisado_por = %s, fecha_revision = CURRENT_TIMESTAMP
+            WHERE id_solicitud = %s AND estado = 'PENDIENTE'
+        """, (datos.id_admin, id_solicitud))
+
+    
+
+        # Notificacion, si es rechazado algun docuento individual se le manda notificacion al alumno
+        if estado_texto == "RECHAZADO":
+            cursor.execute("""
+                SELECT a.numero_cuenta, td.nombre_tipo_documento FROM solicitud s
+                JOIN alumno a ON s.id_alumno = a.id_alumno 
+                JOIN documentos_solicitud ds ON s.id_solicitud = ds.id_solicitud
+                JOIN tipo_documento td ON ds.id_tipo_documento = td.id_tipo_documento
+                WHERE s.id_solicitud = %s AND ds.id_documento = %s LIMIT 1
+            """, (id_solicitud, id_documento))
+            alumno_info = cursor.fetchone()
+            
+            if alumno_info:
+                cursor.execute("""
+                    INSERT INTO notificaciones (numero_cuenta, rol_destino, titulo, mensaje)
+                    VALUES (%s, 'ALUMNO', 'Documento Observado', %s)
+                """, (alumno_info[0], f"Tu archivo '{alumno_info[1]}' fue rechazado por el revisor. Motivo: {comentario_final}"))
 
         conexion.commit()
-
         cursor.close()
         conexion.close()
 
         return {
-            "mensaje": "Estado actualizado correctamente en sistema y documentos",
+            "mensaje": "Documento evaluado correctamente.",
             "id_solicitud": id_solicitud,
-            "estado_nuevo": datos.estado,
-            "comentario_guardado": datos.comentario
+            "id_documento": id_documento,
+            "nuevo_estado": estado_texto,
+            "comentario_registrado": comentario_final
         }
 
     except HTTPException:
@@ -311,7 +438,176 @@ def actualizar_estado_solicitud(
         if conexion:
             conexion.rollback()
             conexion.close()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error en BD: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+
+
+
+
+# Endpoint - Rechazar la solicitud completa del tramite y notificar via correo electronico al alumno
+@router.post("/solicitudes/{id_solicitud}/rechazar", tags=["Administrador / Personal"], summary="Rechazar solicitud completa y notificar via correo electronico")
+def rechazar_solicitud(id_solicitud: int, datos: RechazarSolicitud):
+    if not datos.motivo or datos.motivo.strip() == "":
+        raise HTTPException(status_code=400, detail="El motivo de rechazo es obligatorio.")
+
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+
+        # Extraer los datos necesarios (incluyendo numero_cuenta para la notificacion)
+        cursor.execute("""
+            SELECT s.estado, s.tipo_tramite, a.nombre, a.apellidos, a.correo_electronico, a.numero_cuenta
+            FROM solicitud s
+            JOIN alumno a ON s.id_alumno = a.id_alumno
+            WHERE s.id_solicitud = %s
+        """, (id_solicitud,))
+        solicitud_actual = cursor.fetchone()
+
+        if not solicitud_actual:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+        estado_anterior = solicitud_actual[0]
+
+        
+        if estado_anterior == "DOCUMENTACION_INCORRECTA":
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=400, detail="Esta solicitud ya ha sido rechazada anteriormente. No se pueden enviar más notificaciones.")
+            
+        if estado_anterior == "APROBADA":
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=400, detail="Esta solicitud ya está aprobada, no se puede rechazar.")
+
+        tramite = solicitud_actual[1]
+        nombre_completo = f"{solicitud_actual[2]} {solicitud_actual[3]}" 
+        correo_alumno = solicitud_actual[4] 
+        num_cuenta_alumno = solicitud_actual[5]
+        nuevo_estado = "DOCUMENTACION_INCORRECTA"
+
+        # Actualizar tabla principal solicitud
+        cursor.execute("""
+            UPDATE solicitud
+            SET estado = %s, revisado_por = %s, fecha_revision = CURRENT_TIMESTAMP
+            WHERE id_solicitud = %s
+        """, (nuevo_estado, datos.id_admin, id_solicitud))
+
+        # Se registra cualquier cambio en el historial_resultados
+        cursor.execute("""
+            INSERT INTO historial_estados (id_solicitud, estado_anterior, estado_nuevo, id_admin, comentario)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (id_solicitud, estado_anterior, nuevo_estado, datos.id_admin, datos.motivo))
+        
+        # Notificacion se le notifica al alumno en el sistema
+        cursor.execute("""
+            INSERT INTO notificaciones (numero_cuenta, rol_destino, titulo, mensaje)
+            VALUES (%s, 'ALUMNO', 'Trámite Rechazado', %s)
+        """, (num_cuenta_alumno, f"Tu solicitud de {tramite} fue rechazada. Revisa tu correo o el sistema para corregir."))
+
+        conexion.commit()
+
+        
+        # Se le notifica al alumno por correo electronico el motivo de rechazo
+        correo_enviado = enviar_correo_rechazo(correo_alumno, nombre_completo, tramite, datos.motivo)
+
+        cursor.close()
+        conexion.close()
+
+        mensaje_respuesta = "Solicitud rechazada y auditoría registrada exitosamente."
+        if not correo_enviado:
+            mensaje_respuesta += " (Advertencia: Guardado en BD, pero falló el envío de correo)."
+
+        return {
+            "mensaje": mensaje_respuesta,
+            "id_solicitud": id_solicitud,
+            "estado": nuevo_estado,
+            "auditoria": "Guardada en historial_estados",
+            "correo_notificado": correo_alumno
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+
+
+
+# - - - - - - - - - - - - 
+# ENDPOINTS NOTIFICACIONES
+# - - - - - - - - - - - - 
+
+# Endpoint - Se manda notificaciones en el sistema por cuenta o por cada rol
+@router.get("/notificaciones/{numero_cuenta}", tags=["Notificaciones"], summary="Obtener notificaciones por cuenta o rol")
+def obtener_notificaciones(numero_cuenta: str, rol: str = "ALUMNO"):
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+        # Trae las individuales del usuario y las del rol asignado para el personal
+        cursor.execute("""
+            SELECT id_notificacion, titulo, mensaje, leida, fecha_creacion
+            FROM notificaciones
+            WHERE numero_cuenta = %s OR rol_destino = %s
+            ORDER BY fecha_creacion DESC
+        """, (numero_cuenta, rol.upper()))
+        
+        filas = cursor.fetchall()
+        notificaciones = []
+
+        for fila in filas:
+            notificaciones.append({
+                "id_notificacion": fila[0],
+                "titulo": fila[1],
+                "mensaje": fila[2],
+                "leida": fila[3],
+                "fecha": fila[4]
+            })
+
+        cursor.close()
+        conexion.close()
+        return {"notificaciones": notificaciones}
+
+    except Exception as e:
+        if conexion:
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+
+
+
+
+# Enpoint - Lectura de notificacion marcada como leida
+@router.put("/notificaciones/{id_notificacion}/leer", tags=["Notificaciones"], summary="Marcar notificación como leída")
+def marcar_notificacion_leida(id_notificacion: int):
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("""
+            UPDATE notificaciones SET leida = TRUE WHERE id_notificacion = %s
+        """, (id_notificacion,))
+        
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+        
+        return {"mensaje": "Notificación marcada como leída"}
+
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
