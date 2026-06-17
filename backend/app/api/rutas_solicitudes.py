@@ -14,9 +14,6 @@ if not os.path.exists(CARPETA_UPLOADS):
     os.makedirs(CARPETA_UPLOADS)
 
 
-
-
-
 # Catalogos y esquema de datos
 class OpcionesEstadoDocumento(str, Enum):
     APROBADO = "APROBADO"
@@ -36,8 +33,6 @@ class ActualizarEstadoDocumento(BaseModel):
 class RechazarSolicitud(BaseModel): 
     id_admin: int
     motivo: str
-
-
 
 
 # - - - - - - - - - - - - 
@@ -127,9 +122,6 @@ def crear_solicitud(solicitud: SolicitudCrear):
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
 
-
-
-
 # Endpoint - Subida de documentos por tramite
 @router.post("/solicitudes/{id_solicitud}/documentos/", tags=["Alumno"], summary="Subir un documento a la solicitud")
 async def subir_documento(
@@ -149,12 +141,6 @@ async def subir_documento(
     
     await archivo.seek(0)
 
-    nombre_seguro = f"solicitud_{id_solicitud}_{archivo.filename}"
-    ruta_guardado = os.path.join(CARPETA_UPLOADS, nombre_seguro)
-
-    with open(ruta_guardado, "wb") as buffer:
-        shutil.copyfileobj(archivo.file, buffer)
-
     conexion = conectar_base()
     if conexion is None:
         raise HTTPException(status_code=500, detail="Error en la base de datos")
@@ -162,16 +148,50 @@ async def subir_documento(
     try:
         cursor = conexion.cursor()
         
-        # Insertar el registro del documento individual
+        # Consultar el nombre del tipo de documento usando el ID
+        cursor.execute("SELECT nombre_tipo_documento FROM tipo_documento WHERE id_tipo_documento = %s", (id_tipo_documento,))
+        tipo_doc_bd = cursor.fetchone()
+        
+        if not tipo_doc_bd:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=404, detail="Tipo de documento no encontrado en el catálogo.")
+            
+        # Se guarda el nombre original legible para mostrarlo en el mensaje 
+        nombre_documento_legible = tipo_doc_bd[0]
+        
+        # Se limpia el nombre para guardarlo físicamente sin espacios
+        nombre_tipo_limpio = nombre_documento_legible.replace(" ", "_")
+        
+        # Nombre dinamico
+        nombre_seguro = f"{nombre_tipo_limpio}_solicitud_{id_solicitud}_{archivo.filename}"
+        ruta_guardado = os.path.join(CARPETA_UPLOADS, nombre_seguro)
+
+        # Se guarda físicamente el archivo con el nuevo nombre
+        with open(ruta_guardado, "wb") as buffer:
+            shutil.copyfileobj(archivo.file, buffer)
+
+        # INSERTAR O ACTUALIZAR (Lógica para que el alumno pueda corregir archivos rechazados)
         query_doc = """
-            INSERT INTO documentos_solicitud (id_solicitud, id_tipo_documento, archivo_path, estado) 
-            VALUES (%s, %s, %s, 'PENDIENTE')
+            INSERT INTO documentos_solicitud (id_solicitud, id_tipo_documento, archivo_path, estado, comentario) 
+            VALUES (%s, %s, %s, 'PENDIENTE', NULL)
+            ON CONFLICT (id_solicitud, id_tipo_documento) 
+            DO UPDATE SET 
+                archivo_path = EXCLUDED.archivo_path,
+                estado = 'PENDIENTE',
+                comentario = NULL,
+                fecha_subida = CURRENT_TIMESTAMP
         """
         cursor.execute(query_doc, (id_solicitud, id_tipo_documento, nombre_seguro))
         
-    
-
-        # Notificacion para obtener datos de la cuenta para avisar al personal que corrigio los documentos
+        # Si la solicitud completa estaba "Rechazada", al subir nuevos archivos la regresamos a PENDIENTE
+        cursor.execute("""
+            UPDATE solicitud
+            SET estado = 'PENDIENTE'
+            WHERE id_solicitud = %s AND estado = 'DOCUMENTACION_INCORRECTA'
+        """, (id_solicitud,))
+        
+        # Notificacion para avisar al personal que corrigio o subio documentos
         cursor.execute("""
             SELECT a.numero_cuenta, s.tipo_tramite FROM solicitud s
             JOIN alumno a ON s.id_alumno = a.id_alumno WHERE s.id_solicitud = %s
@@ -182,23 +202,25 @@ async def subir_documento(
             cursor.execute("""
                 INSERT INTO notificaciones (rol_destino, titulo, mensaje)
                 VALUES ('REVISOR', 'Documento Actualizado', %s)
-            """, (f"La solicitud ID {id_solicitud} ({info_solicitud[1]}) de la cuenta {info_solicitud[0]} recibió un nuevo archivo.",))
+            """, (f"La solicitud ID {id_solicitud} ({info_solicitud[1]}) de la cuenta {info_solicitud[0]} recibió un nuevo archivo: {nombre_documento_legible}.",))
         
         conexion.commit()
         cursor.close()
         conexion.close()
         
-        return {"mensaje": "Documento subido exitosamente a la BD y carpeta", "archivo": nombre_seguro}
+        return {
+            "mensaje": f"El documento '{nombre_documento_legible}' se ha subido exitosamente.", 
+            "archivo": nombre_seguro
+        }
 
+    except HTTPException:
+        raise
     except Exception as e:
         if conexion:
             conexion.rollback()
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error al guardar en BD: {str(e)}")
     
-
-
-
 
 # Endpoint - Consultar historial de solicitudes por numero de cuenta
 @router.get("/solicitudes/{numero_cuenta}", tags=["Alumno"], summary="Consultar historial de solicitudes por alumno")
@@ -241,20 +263,35 @@ def consultar_solicitudes_por_alumno(numero_cuenta: str):
         )
 
         filas = cursor.fetchall()
-        solicitudes = []
+        
+        # Diccionario para agrupar las solicitudes y sus documentos anidados
+        solicitudes_dict = {}
 
         for fila in filas:
-            solicitudes.append({
-                "id_solicitud": fila[0],
-                "tipo_tramite": fila[1],
-                "estado_solicitud": fila[2],
-                "observacion_alumno": fila[3],
-                "id_tipo_documento": fila[4],
-                "archivo": fila[5],
-                "comentario_admin": fila[6],
-                "estado_documento": fila[7],
-                "id_documento": fila[8]
-            })
+            id_sol = fila[0]
+            
+            # Si la solicitud no existe en el diccionario, la creamos
+            if id_sol not in solicitudes_dict:
+                solicitudes_dict[id_sol] = {
+                    "id_solicitud": fila[0],
+                    "tipo_tramite": fila[1],
+                    "estado_solicitud": fila[2],
+                    "observacion_alumno": fila[3],
+                    "documentos_tramite": []
+                }
+            
+            # Si hay un documento asociado (como es LEFT JOIN, validamos que no sea NULL)
+            if fila[8] is not None:
+                solicitudes_dict[id_sol]["documentos_tramite"].append({
+                    "id_tipo_documento": fila[4],
+                    "archivo": fila[5],
+                    "comentario_admin": fila[6],
+                    "estado_documento": fila[7],
+                    "id_documento": fila[8]
+                })
+
+        # Convertimos los valores del diccionario de regreso a una lista para el JSON final
+        solicitudes = list(solicitudes_dict.values())
 
         cursor.close()
         conexion.close()
@@ -268,8 +305,6 @@ def consultar_solicitudes_por_alumno(numero_cuenta: str):
         if conexion:
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
-
-
 
 
 # - - - - - - - - - - - - 
@@ -347,9 +382,6 @@ def obtener_todas_las_solicitudes(
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
 
-
-
-
 # Endpoint - Aceptar o Rechazar documento individualmente depende de lo que el personal reivse
 @router.put("/solicitudes/{id_solicitud}/documentos/{id_documento}", tags=["Administrador / Personal"], summary="Evaluar documento individual")
 def evaluar_documento_individual(
@@ -401,24 +433,7 @@ def evaluar_documento_individual(
             WHERE id_solicitud = %s AND estado = 'PENDIENTE'
         """, (datos.id_admin, id_solicitud))
 
-    
-
-        # Notificacion, si es rechazado algun docuento individual se le manda notificacion al alumno
-        if estado_texto == "RECHAZADO":
-            cursor.execute("""
-                SELECT a.numero_cuenta, td.nombre_tipo_documento FROM solicitud s
-                JOIN alumno a ON s.id_alumno = a.id_alumno 
-                JOIN documentos_solicitud ds ON s.id_solicitud = ds.id_solicitud
-                JOIN tipo_documento td ON ds.id_tipo_documento = td.id_tipo_documento
-                WHERE s.id_solicitud = %s AND ds.id_documento = %s LIMIT 1
-            """, (id_solicitud, id_documento))
-            alumno_info = cursor.fetchone()
-            
-            if alumno_info:
-                cursor.execute("""
-                    INSERT INTO notificaciones (numero_cuenta, rol_destino, titulo, mensaje)
-                    VALUES (%s, 'ALUMNO', 'Documento Observado', %s)
-                """, (alumno_info[0], f"Tu archivo '{alumno_info[1]}' fue rechazado por el revisor. Motivo: {comentario_final}"))
+        # (SE ELIMINÓ LA NOTIFICACIÓN INDIVIDUAL COMO FUE SOLICITADO)
 
         conexion.commit()
         cursor.close()
@@ -439,9 +454,6 @@ def evaluar_documento_individual(
             conexion.rollback()
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
-
-
-
 
 
 # Endpoint - Rechazar la solicitud completa del tramite y notificar via correo electronico al alumno
@@ -539,8 +551,6 @@ def rechazar_solicitud(id_solicitud: int, datos: RechazarSolicitud):
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
 
-
-
 # - - - - - - - - - - - - 
 # ENDPOINTS NOTIFICACIONES
 # - - - - - - - - - - - - 
@@ -584,9 +594,6 @@ def obtener_notificaciones(numero_cuenta: str, rol: str = "ALUMNO"):
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
 
-
-
-
 # Enpoint - Lectura de notificacion marcada como leida
 @router.put("/notificaciones/{id_notificacion}/leer", tags=["Notificaciones"], summary="Marcar notificación como leída")
 def marcar_notificacion_leida(id_notificacion: int):
@@ -610,4 +617,4 @@ def marcar_notificacion_leida(id_notificacion: int):
         if conexion:
             conexion.rollback()
             conexion.close()
-        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")   
