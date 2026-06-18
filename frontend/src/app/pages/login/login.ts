@@ -1,5 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
+import { LoginService } from '../../../core/service/login-service';
+import Swal from 'sweetalert2';
 
 const ROLES_VALIDOS = ['alumno', 'personal', 'administrador', 'guardia'];
 
@@ -11,41 +13,23 @@ const ROLES_VALIDOS = ['alumno', 'personal', 'administrador', 'guardia'];
 })
 export class Login {
   numeroCuenta = '';
-  password     = '';
+  password = '';
   mostrarPassword = false;
 
   constructor(private router: Router) {}
 
-  async login() {
+  loginUser = inject(LoginService);
+
+  verificateLogin() {
     if (!this.numeroCuenta || !this.password) {
-      alert('Por favor, complete todos los campos');
+      Swal.fire({
+        icon: 'warning',
+        title: 'Campos incompletos',
+        text: 'Por favor, complete todos los campos',
+      });
       return;
     }
-        
-        this.router.navigate(['/home']);
-
-
-        /* 
-    try {
-      const response = await axios.post(
-        `http://127.0.0.1:8000/login/?numero_cuenta=${this.numeroCuenta}`,
-        { password: this.password },
-      );
-
-      const { rol, mensaje } = response.data;
-
-      if (ROLES_VALIDOS.includes(rol)) {
-        localStorage.setItem('cuentaUsuario', this.numeroCuenta);
-        localStorage.setItem('rolUsuario', rol);
-        this.router.navigate(['/home']);
-      } else {
-        alert(mensaje || 'Credenciales incorrectas');
-      }
-    } catch (error) {
-      console.error('Error al conectar con el servidor', error);
-      alert('No se pudo conectar con el servidor. Por favor, intente más tarde.');
-    }
-    */
+    this.loginUser.login(this.numeroCuenta).subscribe();
   }
   togglePassword() {
     this.mostrarPassword = !this.mostrarPassword;

@@ -55,7 +55,7 @@ export class Layout implements OnInit {
   constructor(private router: Router) {}
 
   ngOnInit() {
-    this.userAccount = localStorage.getItem('cuentaUsuario') || '';
+    this.userAccount = localStorage.getItem('numeroCuenta') || '';
     this.userRole    = localStorage.getItem('rolUsuario')    || '';
 
     // Redirigir a login si no hay usuario autenticado
@@ -66,7 +66,7 @@ export class Layout implements OnInit {
     }
     */
 
-    this.menuItems   = ROLE_MENUS["alumno"] || [];
+    this.menuItems   = ROLE_MENUS["personal"] || [];
     this.userInitials = this.userAccount.slice(0, 2).toUpperCase();
     this.currentRoute = this.router.url;
 
@@ -88,7 +88,7 @@ export class Layout implements OnInit {
   }
 
   logout() {
-    localStorage.removeItem('cuentaUsuario');
+    localStorage.removeItem('numeroCuenta');
     localStorage.removeItem('rolUsuario');
     this.router.navigate(['/login']);
   }

@@ -215,21 +215,3 @@
   </aside>
 
 </div>
-
-<section class="history-section">
-  <h2 class="history-title">Mis Solicitudes Recientes</h2>
-  <div class="history-list">
-    <div *ngFor="let s of historial" class="history-item">
-      <div class="history-info">
-        <div class="history-tipo">{{ s.tipo }}</div>
-        <div class="history-meta">
-          <span class="folio">{{ s.folio }}</span> · {{ s.fecha }}
-        </div>
-      </div>
-      <span class="badge" [ngClass]="'badge--' + s.estado">
-        <span class="badge-dot"></span>
-        {{ getEstadoLabel(s.estado) }}
-      </span>
-    </div>
-  </div>
-</section>
