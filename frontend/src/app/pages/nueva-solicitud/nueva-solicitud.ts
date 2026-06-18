@@ -1,20 +1,15 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import {
-  SolicitudService,
   SolicitudResumen,
   NuevaSolicitudPayload,
   TipoSolicitudApi,
-} from '../../../core/service/solicitud-service';
+  DocumentoRequerido,
+} from '../../../core/interfaces/interfaces';
+import { SolicitudService } from '../../../core/service/solicitud-service';
 
 type TipoSolicitud = '' | TipoSolicitudApi;
 
-interface DocumentoRequerido {
-  id: string;
-  nombre: string;
-  formatos: string;
-  archivo: File | null;
-  error: string | null;
-}
+
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -48,7 +43,7 @@ const DOC_ICONS: Record<string, string> = {
   templateUrl: './nueva-solicitud.html',
   styleUrl:    './nueva-solicitud.css',
 })
-export class NuevaSolicitud implements OnInit {
+export class NuevaSolicitud {
   tipoSolicitud: TipoSolicitud = '';
   documentos: DocumentoRequerido[] = [];
   historial: SolicitudResumen[] = [];
@@ -56,23 +51,18 @@ export class NuevaSolicitud implements OnInit {
 
   constructor(private solicitudService: SolicitudService) {}
 
-  ngOnInit(): void {
-    const numeroCuenta = localStorage.getItem('cuentaUsuario') || '';
-    this.solicitudService.listarMisSolicitudes(numeroCuenta).subscribe({
-      next:  (lista) => { this.historial = lista; },
-      error: ()      => { this.historial = [];    },
-    });
-  }
+ 
+  
 
   get hayEstacionamientoActiva(): boolean {
     return this.historial.some(
-      s => s.tipo === 'Permiso de Estacionamiento' && s.estado === 'en_revision',
+      s => s.tipo_tramite === 'Permiso de Estacionamiento' && s.estado === 'en_revision',
     );
   }
 
   get hayLockerActivo(): boolean {
     return this.historial.some(
-      s => s.tipo === 'Obtención de Locker' && s.estado === 'en_revision',
+      s => s.tipo_tramite === 'Obtención de Locker' && s.estado === 'en_revision',
     );
   }
 
@@ -147,11 +137,12 @@ export class NuevaSolicitud implements OnInit {
       next: (res) => {
         this.historial = [
           {
-            id:     String(Date.now()),
-            tipo:   tipoLabel,
+            id_solicitud:     String(Date.now()),
+            tipo_tramite:   tipoLabel,
             folio:  res.folio,
-            fecha:  new Date().toLocaleDateString('es-MX'),
+            fecha_solicitud:  new Date().toLocaleDateString('es-MX'),
             estado: 'en_revision',
+            observacion_alumno: '',
           },
           ...this.historial,
         ];
@@ -178,6 +169,7 @@ export class NuevaSolicitud implements OnInit {
       en_revision: 'En revisión',
       aprobada:    'Aprobada',
       rechazada:   'Rechazada',
+      pendiente:   'Pendiente',
     };
     return labels[estado];
   }
@@ -190,6 +182,8 @@ export class NuevaSolicitud implements OnInit {
     return {
       numeroCuenta: localStorage.getItem('cuentaUsuario') || '',
       tipo:         (this.tipoSolicitud || 'locker') as TipoSolicitudApi,
+      
+      /* 
       documentos:   this.documentos
         .filter(d => d.archivo !== null)
         .map(d => ({
@@ -198,6 +192,7 @@ export class NuevaSolicitud implements OnInit {
           archivoNombre: d.archivo!.name,
           archivoTamano: d.archivo!.size,
         })),
+        */
     };
   }
 }

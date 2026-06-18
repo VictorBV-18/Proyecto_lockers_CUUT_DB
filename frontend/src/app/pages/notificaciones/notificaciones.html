@@ -1,10 +1,88 @@
-<div class="page-header">
-  <h1 class="page-title">Notificaciones</h1>
-  <p class="page-desc">Revisa tus notificaciones y avisos del sistema.</p>
-</div>
-<div class="empty-card">
-  <div class="empty-icon">🔔</div>
-  <p class="empty-title">Sin notificaciones</p>
-  <p class="empty-text">No tienes notificaciones nuevas.</p>
-</div>
+<section class="notificaciones">
 
+  <!-- Encabezado -->
+  <header class="notif-head">
+    <h1 class="notif-head__title">Centro de Notificaciones</h1>
+    <p class="notif-head__subtitle">Mantente al día con tus trámites y noticias académicas.</p>
+  </header>
+
+  <!-- Lista de notificaciones -->
+  <div class="notif-list">
+
+    <!-- Notificación: denegada (danger) -->
+    <article class="notif notif--danger">
+      <span class="notif__icon notif__icon--danger">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 4 2.5 20.5h19L12 4Z" />
+          <path d="M12 10v4M12 17.5h.01" />
+        </svg>
+      </span>
+
+      <div class="notif__body">
+        <div class="notif__head">
+          <h2 class="notif__title">Solicitud de Estacionamiento</h2>
+          <span class="notif__time">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+            </svg>
+            Hace 15 minutos
+          </span>
+        </div>
+        <p class="notif__text">
+          Tu solicitud para tarjeta de estacionamiento ha sido denegada para mas información
+          consulta los detalles de la solicitud
+        </p>
+        <div class="notif__actions">
+          <button type="button" class="btn-outline">Ver detalles</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- Notificación: procesada (success) -->
+    <article class="notif notif--success">
+      <span class="notif__icon notif__icon--success">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z" />
+          <path d="M14 3v5h5" />
+        </svg>
+      </span>
+
+      <div class="notif__body">
+        <div class="notif__head">
+          <h2 class="notif__title">Solicitud de locker</h2>
+          <span class="notif__time">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+            </svg>
+            Hoy, 10:30 AM
+          </span>
+        </div>
+        <p class="notif__text">
+          Tu solicitud de prestado de locker ha sido procesada exitosamente. El archivo PDF ya
+          se encuentra disponible para su descarga en tu sección de documentos.
+        </p>
+        <div class="notif__actions">
+          <button type="button" class="link-action">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 4v11m0 0 4-4m-4 4-4-4" /><path d="M5 19h14" />
+            </svg>
+            Descargar PDF
+          </button>
+        </div>
+      </div>
+
+      <button type="button" class="notif__menu" aria-label="Más opciones">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" />
+        </svg>
+      </button>
+    </article>
+
+  </div>
+
+</section>

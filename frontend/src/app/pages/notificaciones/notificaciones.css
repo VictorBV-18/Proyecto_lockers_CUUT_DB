@@ -6,3 +6,187 @@
 .empty-icon  { font-size: 2.5rem; margin-bottom: 0.75rem; }
 .empty-title { font-weight: 600; color: #1f2a24; margin: 0 0 0.25rem; }
 .empty-text  { color: #8a908b; font-size: 0.9rem; margin: 0; }
+
+/* ============================================================
+   notificaciones.component.css
+   Usa las variables globales de styles.css (no redefinir :root)
+   ============================================================ */
+
+:host { display: block; }
+
+.notificaciones {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 32px 40px 48px;
+}
+
+/* ---------- Encabezado ---------- */
+.notif-head { margin-bottom: 28px; }
+.notif-head__title {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -0.9px;
+  color: var(--text);
+}
+.notif-head__subtitle {
+  margin-top: 6px;
+  font-size: 17px;
+  color: var(--text-soft);
+}
+
+/* ---------- Lista ---------- */
+.notif-list {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ---------- Tarjeta de notificación ---------- */
+.notif {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--neutral);
+  border-radius: 16px;
+  padding: 26px 30px;
+  box-shadow: 0 1px 2px rgba(16, 34, 24, 0.04), 0 6px 20px -12px rgba(16, 34, 24, 0.10);
+}
+
+/* Variantes por estado */
+.notif--danger {
+  border-left-color: var(--danger);
+}
+.notif--success {
+  border-left-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 5%, var(--white));
+}
+
+/* ---------- Icono ---------- */
+.notif__icon {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.notif__icon svg { width: 26px; height: 26px; }
+.notif__icon--danger  { background: var(--danger-bg);  color: var(--danger); }
+.notif__icon--success { background: var(--success-bg); color: var(--success); }
+
+/* ---------- Cuerpo ---------- */
+.notif__body { flex: 1; min-width: 0; }
+
+.notif__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.notif__title {
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--text);
+}
+.notif__time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  padding-right: 26px; /* deja aire para el menú kebab */
+}
+.notif__time svg { width: 15px; height: 15px; }
+
+.notif__text {
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--text-soft);
+  max-width: 880px;
+}
+
+/* ---------- Acciones ---------- */
+.notif__actions { margin-top: 18px; }
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  padding: 11px 22px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-field);
+  background: var(--white);
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+
+.link-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--primary);
+  cursor: pointer;
+}
+.link-action svg { width: 18px; height: 18px; }
+.link-action:hover { color: var(--primary-dark); }
+
+/* ---------- Menú kebab ---------- */
+.notif__menu {
+  position: absolute;
+  top: 50%;
+  right: 22px;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--neutral);
+  padding: 6px;
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.notif__menu svg { width: 20px; height: 20px; display: block;}
+.notif__menu:hover { background: #eef3f0; color: var(--text); }
+
+/* ---------- Cargar más ---------- */
+.notif-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 36px;
+}
+.link-more {
+  border: none;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  padding: 8px 4px;
+}
+.link-more:hover { color: var(--primary); }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 720px) {
+  .notificaciones { padding: 24px 18px 36px; }
+  .notif-head__title { font-size: 30px; }
+  .notif { padding: 20px 18px; gap: 14px; }
+  .notif__head { flex-direction: column; gap: 4px; }
+  .notif__time { padding-right: 0; }
+  .notif__menu { top: 18px; transform: none; right: 14px; }
+}
