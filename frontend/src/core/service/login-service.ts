@@ -23,7 +23,7 @@ export class LoginService {
       .pipe(
         tap((response) => {
           Swal.fire({
-            position: 'top-start',
+            position: 'center',
             icon: 'success',
             title: `${response.mensaje}`,
             showConfirmButton: false,
@@ -36,7 +36,7 @@ export class LoginService {
         }),
         catchError((error) => {
           Swal.fire({
-            position: 'top-start',
+            position: 'center',
             icon: 'error',
             title: 'Error en el login',
             showConfirmButton: false,
