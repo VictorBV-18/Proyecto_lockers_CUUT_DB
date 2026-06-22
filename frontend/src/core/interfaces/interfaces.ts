@@ -1,5 +1,12 @@
 export type TipoSolicitudApi   = 'estacionamiento' | 'locker';
 export type EstadoSolicitudApi = 'en_revision' | 'aprobada' | 'rechazada' | 'pendiente';
+export type TipoDocumento = [
+  {id:1 , nombre : "INE"},
+  {id:2 , nombre: "Tira de materias"},
+  {id:3 , nombre : "Tarjeta de circulacion"},
+  {id:4, nombre :"Licencia de conducir"},
+  {id:5, nombre :"Credencial escolar"}
+]
 
 export interface loginResponse{
   mensaje:string
@@ -10,18 +17,23 @@ export interface MiSolicitudResponse {
   solicitudes: SolicitudResumen[];
 }
 
-
-export interface DocumentoAdjuntoPayload {
-  id:            string;
-  nombre:        string;
-  archivoNombre: string;
-  archivoTamano: number;
+export interface NuevaSolicitudPayload {
+  numero_cuenta: string;
+  tipo_tramite:  TipoSolicitudApi;
+  observacion: string | null
+  correo_electronico: string
+}
+export interface NuevaSolicitudResponse {
+  mensaje : string,
+  archivo: string
 }
 
-export interface NuevaSolicitudPayload {
-  numeroCuenta: string;
-  tipo:         TipoSolicitudApi;
-  //documentos:   DocumentoAdjuntoPayload[];
+export interface NuevaSolcitudResponse {
+  mensaje: string,
+  id_solicitud: number,
+  observacion_registrada: string,
+  correo_actualizado: string
+  estatus : true
 }
 
 export interface SolicitudResumen {
@@ -44,6 +56,7 @@ export interface SolicitudDetalle {
 
 export interface DocumentoRequerido {
   id: string;
+  idTipoDocumento: number;
   nombre: string;
   formatos: string;
   archivo: File | null;

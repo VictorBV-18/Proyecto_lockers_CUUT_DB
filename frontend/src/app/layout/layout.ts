@@ -66,7 +66,7 @@ export class Layout implements OnInit {
     }
     */
 
-    this.menuItems   = ROLE_MENUS["personal"] || [];
+    this.menuItems   = ROLE_MENUS[this.userRole] || [];
     this.userInitials = this.userAccount.slice(0, 2).toUpperCase();
     this.currentRoute = this.router.url;
 
