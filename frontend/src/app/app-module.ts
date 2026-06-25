@@ -21,6 +21,8 @@ import { Usuarios }         from './pages/usuarios/usuarios';
 import { PermisosRoles }    from './pages/permisos-roles/permisos-roles';
 import { Verificacion }     from './pages/verificacion/verificacion';
 import { Notificaciones }   from './pages/notificaciones/notificaciones';
+import { AdminConfiguracion } from './pages/admin-configuracion/admin-configuracion';
+import { Auditoria }          from './pages/auditoria/auditoria';
 
 @NgModule({
   declarations: [
@@ -40,6 +42,8 @@ import { Notificaciones }   from './pages/notificaciones/notificaciones';
     PermisosRoles,
     Verificacion,
     Notificaciones,
+    AdminConfiguracion,
+    Auditoria,
   ],
   imports: [
     BrowserModule,

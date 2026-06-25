@@ -1,10 +1,43 @@
 <div class="page-header">
   <h1 class="page-title">Usuarios</h1>
-  <p class="page-desc">Administra los usuarios del sistema y sus datos.</p>
-</div>
-<div class="empty-card">
-  <div class="empty-icon">👥</div>
-  <p class="empty-title">Gestión de usuarios</p>
-  <p class="empty-text">Esta sección está en desarrollo.</p>
+  <p class="page-desc">Consulta los usuarios del sistema y sus datos.</p>
 </div>
 
+<!-- Filtro -->
+<div class="filters-bar">
+  <select class="filter-input" [(ngModel)]="filtroRol" (change)="filtrarPorRol()">
+    <option value="">Todos los roles</option>
+    <option *ngFor="let r of roles" [value]="r">{{ getRolTexto(r) }}</option>
+  </select>
+</div>
+
+<!-- Tabla -->
+<div class="table-card">
+  <div class="table-wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Correo</th>
+          <th>Rol</th>
+          <th>Estado</th>
+          <th>Último Acceso</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let u of usuariosFiltrados">
+          <td class="td-name">{{ u.nombre }}</td>
+          <td>{{ u.correo }}</td>
+          <td>{{ getRolTexto(u.rol) }}</td>
+          <td>
+            <span class="badge" [ngClass]="getEstadoClase(u.estado)">{{ u.estado }}</span>
+          </td>
+          <td class="td-date">{{ u.ultimoAcceso }}</td>
+        </tr>
+        <tr *ngIf="usuariosFiltrados.length === 0">
+          <td colspan="5" class="td-empty">No se encontraron usuarios.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

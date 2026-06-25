@@ -1,0 +1,143 @@
+<!-- ─── Encabezado de página ─────────────────────────────────────── -->
+<div class="aud-page-header">
+  <div>
+    <h1 class="aud-page-title">Auditoría del Sistema</h1>
+    <p class="aud-page-desc">Registro inmutable de todas las acciones realizadas en el sistema.</p>
+  </div>
+  <div class="aud-export-actions">
+    <button class="aud-btn aud-btn--export-pdf" (click)="exportarPDF()">
+      <svg class="aud-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10 9 9 9 8 9"/>
+      </svg>
+      Exportar PDF
+    </button>
+    <button class="aud-btn aud-btn--export-excel" (click)="exportarExcel()">
+      <svg class="aud-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+      </svg>
+      Exportar Excel
+    </button>
+  </div>
+</div>
+
+<!-- ─── Aviso inmutabilidad ──────────────────────────────────────── -->
+<div class="aud-immutable-banner">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round" class="aud-banner-icon">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+  </svg>
+  <span>Este registro es de <strong>solo lectura</strong>. No es posible modificar ni eliminar entradas del log de auditoría.</span>
+</div>
+
+<!-- ─── Filtros ──────────────────────────────────────────────────── -->
+<div class="aud-filters-card">
+  <div class="aud-filters-row">
+    <div class="aud-filter-group">
+      <label class="aud-filter-label">Buscar</label>
+      <div class="aud-search-wrap">
+        <svg class="aud-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input
+          id="aud-search"
+          type="text"
+          class="aud-field-input aud-field-input--search"
+          placeholder="Usuario, acción o descripción..."
+          [(ngModel)]="filtroBusqueda"
+          (ngModelChange)="aplicarFiltros()"
+        />
+      </div>
+    </div>
+
+    <div class="aud-filter-group">
+      <label class="aud-filter-label">Tipo de Acción</label>
+      <select id="aud-accion" class="aud-field-input" [(ngModel)]="filtroAccion" (ngModelChange)="aplicarFiltros()">
+        <option value="">Todas las acciones</option>
+        <option *ngFor="let a of acciones" [value]="a">{{ a }}</option>
+      </select>
+    </div>
+
+    <div class="aud-filter-group">
+      <label class="aud-filter-label">Fecha</label>
+      <input
+        id="aud-fecha"
+        type="date"
+        class="aud-field-input"
+        [(ngModel)]="filtroFecha"
+        (ngModelChange)="aplicarFiltros()"
+      />
+    </div>
+
+    <button class="aud-btn aud-btn--ghost" (click)="limpiarFiltros()">
+      <svg class="aud-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+      Limpiar
+    </button>
+  </div>
+</div>
+
+<!-- ─── Tabla de Auditoría ───────────────────────────────────────── -->
+<div class="aud-table-card">
+  <div class="aud-table-wrapper">
+    <table class="aud-data-table">
+      <thead>
+        <tr>
+          <th>Fecha / Hora</th>
+          <th>Usuario</th>
+          <th>Acción</th>
+          <th>Descripción</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Filas de datos (cuando el endpoint esté disponible) -->
+        <tr *ngFor="let r of registrosFiltrados">
+          <td class="aud-td-fecha">{{ r.fecha }}</td>
+          <td class="aud-td-usuario">{{ r.usuario }}</td>
+          <td>
+            <span class="aud-badge" [ngClass]="getAccionClase(r.accion)">{{ r.accion }}</span>
+          </td>
+          <td class="aud-td-desc">{{ r.descripcion }}</td>
+        </tr>
+
+        <!-- Estado vacío -->
+        <tr *ngIf="registrosFiltrados.length === 0">
+          <td colspan="4" class="aud-td-empty">
+            <div class="aud-empty-state">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                   stroke-linecap="round" stroke-linejoin="round" class="aud-empty-icon">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <p class="aud-empty-title">Sin registros de auditoría</p>
+              <p class="aud-empty-sub">
+                Los registros aparecerán aquí cuando el endpoint de auditoría esté disponible.
+              </p>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pie de tabla con contador -->
+  <div class="aud-table-footer">
+    <span class="aud-count">{{ registrosFiltrados.length }} registros encontrados</span>
+    <span class="aud-readonly-tag">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+      Registro inmutable
+    </span>
+  </div>
+</div>
