@@ -1,27 +1,24 @@
+<div class="solicitudes">
+  <!-- Breadcrumb -->
+  <nav class="breadcrumb" aria-label="Ruta de navegación">
+    <a href="#">Portal</a>
+    <span class="breadcrumb__sep">/</span>
+    <span class="breadcrumb__current">Mis Solicitudes</span>
+  </nav>
 
-  <div class="solicitudes">
+  <!-- Encabezado -->
+  <header class="page-head">
+    <div>
+      <h2 class="page-head__title">Gestión de Solicitudes</h2>
+      <p class="page-head__subtitle">
+        Consulta el estado actual y el historial de tus trámites académicos.
+      </p>
+    </div>
+  </header>
 
-    <!-- Breadcrumb -->
-    <nav class="breadcrumb" aria-label="Ruta de navegación">
-      <a href="#">Portal</a>
-      <span class="breadcrumb__sep">/</span>
-      <span class="breadcrumb__current">Mis Solicitudes</span>
-    </nav>
-
-    <!-- Encabezado -->
-    <header class="page-head">
-      <div>
-        <h2 class="page-head__title">Gestión de Solicitudes</h2>
-        <p class="page-head__subtitle">
-          Consulta el estado actual y el historial de tus trámites académicos.
-        </p>
-      </div>
-    </header>
-
-
-    <!-- Panel de tabla -->
-    <section class="panel">
-      
+  <!-- Panel de tabla -->
+  <section class="panel">
+    @if (this.solicitudesUsuario.misTramites().length > 0) {
       <div class="table-wrap">
         <table class="table">
           <thead>
@@ -34,57 +31,168 @@
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td class="td-folio">#SOL-2023-0891</td>
-              <td>Solicitud de Estacionamiento</td>
-              <td class="td-muted">24 Oct 2023</td>
-              <td>
-                <span class="badge badge--success"><i class="dot"></i>Aprobada</span>
-              </td>
-              <td class="td-actions">
-                <button type="button" class="icon-btn" aria-label="Ver">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-                       stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                </button>
-                <button type="button" class="icon-btn" aria-label="Descargar">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-                       stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 4v11m0 0 4-4m-4 4-4-4" />
-                    <path d="M5 19h14" />
-                  </svg>
-                </button>
-              </td>
-            </tr>
-            <tr>
-              <td class="td-folio">#SOL-2023-1022</td>
-              <td>Solicitud de locker</td>
-              <td class="td-muted">02 Nov 2023</td>
-              <td>
-                <span class="badge badge--warning"><i class="dot"></i>En Revisión</span>
-              </td>
-              <td class="td-actions">
-                <button type="button" class="icon-btn" aria-label="Ver">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-                       stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                </button>
-                <button type="button" class="icon-btn" aria-label="Editar">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-                       stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 20h9" />
-                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                  </svg>
-                </button>
-              </td>
-            </tr>
+            @for (sol of this.solicitudesUsuario.misTramites(); track sol.id_solicitud) {
+              <tr>
+                <td class="td-folio">{{ sol.folio }}</td>
+                <td>Solicitud de {{ sol.tipo_tramite }}</td>
+                <td class="td-muted">{{ this.getFechaFormateada(sol.fecha_solicitud) }}</td>
+                <td>
+                  <span class="badge" [ngClass]="'badge--' + getClaseEstado(sol.estado_solicitud)"
+                    ><i class="dot"></i>{{ sol.estado_solicitud }}</span
+                  >
+                </td>
+                <td class="td-actions">
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    aria-label="Ver documentos"
+                    title="Ver documentos"
+                    (click)="verDocumentos(sol)"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                </td>
+              </tr>
+            }
           </tbody>
         </table>
       </div>
+    } @else {
+      <h2 style="text-align: center">No tienes solicitudes...</h2>
+    }
+  </section>
+</div>
 
-    </section>
-  </div>
+<!-- ======================================================
+     Modal: Documentos de la solicitud
+     ====================================================== -->
+@if (modalAbierto) {
+  <div class="modal-backdrop" (click)="cerrarModal()">
+    <div class="modal-panel" (click)="$event.stopPropagation()">
+
+      <!-- Cabecera del modal -->
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Documentos de la Solicitud</h3>
+          @if (solicitudSeleccionada) {
+            <p class="modal-subtitle">
+              {{ solicitudSeleccionada.folio }} &middot; {{ getTipoLabel(solicitudSeleccionada.tipo_tramite) }}
+            </p>
+          }
+        </div>
+        <button class="modal-close" (click)="cerrarModal()" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6 6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Cuerpo del modal -->
+      <div class="modal-body">
+
+        @if (cargandoModal) {
+          <div class="modal-loading">
+            <span class="spinner"></span>
+            Cargando documentos…
+          </div>
+        } @else if (solicitudSeleccionada) {
+
+          <!-- Estado de la solicitud -->
+          <div class="modal-estado-row">
+            <span class="label-muted">Estado de la solicitud:</span>
+            <span class="badge" [ngClass]="'badge--' + getClaseEstado(solicitudSeleccionada.estado_solicitud)">
+              <i class="dot"></i>{{ solicitudSeleccionada.estado_solicitud }}
+            </span>
+          </div>
+
+          <!-- Lista de documentos -->
+          @if (solicitudSeleccionada.documentos_tramite.length === 0) {
+            <p class="modal-empty">No hay documentos registrados en esta solicitud.</p>
+          } @else {
+            <ul class="doc-list">
+              @for (doc of solicitudSeleccionada.documentos_tramite; track doc.id_documento) {
+                <li class="doc-item"
+                    [class.doc-item--aprobado]="doc.estado_documento === 'APROBADO'"
+                    [class.doc-item--rechazado]="doc.estado_documento === 'RECHAZADO'">
+
+                  <!-- Nombre + badge estado -->
+                  <div class="doc-item__top">
+                    <div class="doc-item__icon-wrap">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+                           stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+                      </svg>
+                    </div>
+                    <div class="doc-item__info">
+                      <span class="doc-item__name">{{ getNombreDocumento(doc.id_tipo_documento) }}</span>
+                      <span class="badge badge--sm" [ngClass]="'badge--' + getClaseEstado(doc.estado_documento)">
+                        <i class="dot"></i>{{ doc.estado_documento }}
+                      </span>
+                    </div>
+
+                    <!-- Icono de validación para APROBADO -->
+                    @if (doc.estado_documento === 'APROBADO') {
+                      <div class="doc-item__check" title="Documento validado">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                             stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M20 6 9 17l-5-5"/>
+                        </svg>
+                      </div>
+                    }
+                  </div>
+
+                  <!-- Motivo de rechazo + botón re-subir -->
+                  @if (doc.estado_documento === 'RECHAZADO') {
+                    <div class="doc-item__reject">
+                      @if (doc.comentario_admin) {
+                        <p class="doc-reject-reason">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                               stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 8v4m0 4h.01"/>
+                          </svg>
+                          <span>{{ doc.comentario_admin }}</span>
+                        </p>
+                      }
+                      <label class="btn-resubir"
+                             [class.btn-resubir--loading]="subiendoDocumento[doc.id_tipo_documento]">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                             stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="17 8 12 3 7 8"/>
+                          <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        {{ subiendoDocumento[doc.id_tipo_documento] ? 'Subiendo…' : 'Volver a subir' }}
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          [disabled]="subiendoDocumento[doc.id_tipo_documento]"
+                          (change)="onResubirDocumento($event, doc.id_tipo_documento)"
+                        />
+                      </label>
+                    </div>
+                  }
+
+                </li>
+              }
+            </ul>
+          }
+
+        }
+      </div><!-- /modal-body -->
+
+    </div><!-- /modal-panel -->
+  </div><!-- /modal-backdrop -->
+}

@@ -15,12 +15,82 @@ class ActualizarEstadoDocumento(BaseModel):
     estado: OpcionesEstadoDocumento
     comentario: str | None = None
 
-class RechazarSolicitud(BaseModel): 
+class RechazarSolicitud(BaseModel):
     id_admin: int
     motivo: str
 
 
 
+
+
+@router.get("/solicitudes/{id_solicitud}/detalle", tags=["Administrador / Personal"], summary="Obtener documentos de una solicitud para revisión")
+def obtener_detalle_solicitud(id_solicitud: int):
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+
+        cursor.execute("""
+            SELECT
+                s.id_solicitud,
+                s.tipo_tramite,
+                s.estado,
+                a.numero_cuenta,
+                a.nombre || ' ' || a.apellidos AS nombre_completo,
+                s.fecha_solicitud,
+                ds.id_documento,
+                ds.id_tipo_documento,
+                td.nombre_tipo_documento,
+                ds.archivo_path,
+                ds.estado AS estado_documento,
+                ds.comentario
+            FROM solicitud s
+            JOIN alumno a ON s.id_alumno = a.id_alumno
+            LEFT JOIN documentos_solicitud ds ON s.id_solicitud = ds.id_solicitud
+            LEFT JOIN tipo_documento td ON ds.id_tipo_documento = td.id_tipo_documento
+            WHERE s.id_solicitud = %s
+            ORDER BY ds.id_tipo_documento
+        """, (id_solicitud,))
+
+        filas = cursor.fetchall()
+        cursor.close()
+        conexion.close()
+
+        if not filas:
+            raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+
+        primera = filas[0]
+        detalle = {
+            "id_solicitud": primera[0],
+            "tipo_tramite": primera[1],
+            "estado": primera[2],
+            "numero_cuenta": primera[3],
+            "nombre_completo": primera[4],
+            "fecha_solicitud": primera[5],
+            "documentos": []
+        }
+
+        for fila in filas:
+            if fila[6] is not None:
+                detalle["documentos"].append({
+                    "id_documento": fila[6],
+                    "id_tipo_documento": fila[7],
+                    "nombre_tipo_documento": fila[8],
+                    "archivo": fila[9],
+                    "estado_documento": fila[10],
+                    "comentario_admin": fila[11]
+                })
+
+        return detalle
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conexion:
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
 
 @router.get("/solicitudes/", tags=["Administrador / Personal"], summary="Obtener todas las solicitudes de los alumnos (Tabla principal)")

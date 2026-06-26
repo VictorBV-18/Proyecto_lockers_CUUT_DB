@@ -10,6 +10,8 @@ import Swal from 'sweetalert2';
 import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
 
+const ESTADOS_ACTIVOS = ['PENDIENTE', 'EN_REVISION', 'APROBADA', 'DATOS_INCOMPLETOS'];
+
 type TipoSolicitud = '' | TipoSolicitudApi;
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -49,25 +51,29 @@ const DOC_ICONS: Record<string, string> = {
 export class NuevaSolicitud {
   tipoSolicitud: TipoSolicitud = '';
   documentos: DocumentoRequerido[] = [];
-  historial: SolicitudResumen[] = [];
   enviando = false;
   idSolicitudActual: number | null = null;
+  numeroCuenta = localStorage.getItem('numeroCuenta') || '';
 
   constructor(
     private solicitudService: SolicitudService,
     private router: Router,
   ) {}
 
+  ngOnInit(): void {
+    this.solicitudService.listarMisSolicitudes(this.numeroCuenta).subscribe();
+  }
+
   get hayEstacionamientoActiva(): boolean {
-    return this.historial.some(
-      (s) => s.tipo_tramite === 'Permiso de Estacionamiento' && s.estado === 'en_revision',
-    );
+    return this.solicitudService
+      .misTramites()
+      .some((s) => s.tipo_tramite === 'estacionamiento' && ESTADOS_ACTIVOS.includes(s.estado_solicitud));
   }
 
   get hayLockerActivo(): boolean {
-    return this.historial.some(
-      (s) => s.tipo_tramite === 'Obtención de Locker' && s.estado === 'en_revision',
-    );
+    return this.solicitudService
+      .misTramites()
+      .some((s) => s.tipo_tramite === 'locker' && ESTADOS_ACTIVOS.includes(s.estado_solicitud));
   }
 
   onTipoChange(): void {
@@ -159,9 +165,16 @@ export class NuevaSolicitud {
 
     forkJoin(subidas).subscribe({
       next: () => {
-        this.enviando = false;
-        this.solicitudService.peticionSuccess('Solicitud enviada con éxito.');
-        this.router.navigate(['/home/mis-solicitudes']);
+        this.solicitudService.finalizarSolicitud(idSolicitud).subscribe({
+          next: () => {
+            this.enviando = false;
+            this.solicitudService.peticionSuccess('Solicitud enviada con éxito.');
+            this.router.navigate(['/home/mis-solicitudes']);
+          },
+          error: () => {
+            this.enviando = false;
+          },
+        });
       },
       error: () => {
         this.enviando = false;

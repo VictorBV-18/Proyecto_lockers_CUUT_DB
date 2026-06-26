@@ -27,17 +27,18 @@ def iniciar_sesion(numero_cuenta: str):
             }
             
         # Si no es alumno se busca en PERSONAL / ADMIN
-        cursor.execute("SELECT nombre, apellidos, rol FROM admin WHERE numero_cuenta = %s", (numero_cuenta,))
+        cursor.execute("SELECT id_admin, nombre, apellidos, rol FROM admin WHERE numero_cuenta = %s", (numero_cuenta,))
         personal = cursor.fetchone()
-        
+
         cursor.close()
         conexion.close()
-        
+
         if personal:
-            rol_personal = personal[2].lower() 
+            rol_personal = personal[3].lower()
             return {
-                "mensaje": f"Bienvenido(a), {personal[0]} {personal[1]}",
-                "rol": rol_personal
+                "mensaje": f"Bienvenido(a), {personal[1]} {personal[2]}",
+                "rol": rol_personal,
+                "id_admin": personal[0]
             }
             
         # Si no se encuentra en ninguna tabla
