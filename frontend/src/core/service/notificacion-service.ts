@@ -13,8 +13,8 @@ export class NotificacionService {
     constructor(private http: HttpClient) {}
 
 
-    notificaciones(numeroCuenta:string):Observable<any>{
-      return this.http.get<any>(`${this.API_URL}/notificaciones/${numeroCuenta}`).pipe(
+    notificaciones(numeroCuenta:string , rol:string):Observable<any>{
+      return this.http.get<any>(`${this.API_URL}/notificaciones/${numeroCuenta}?rol=${rol}`).pipe(
         tap((response) => {
 
         }),

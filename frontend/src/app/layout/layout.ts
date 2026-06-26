@@ -13,12 +13,12 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: 'Mis Solicitudes',   route: '/home/mis-solicitudes', icon: 'list'          },
     { label: 'Nueva Solicitud',   route: '/home/nueva-solicitud', icon: 'plus'          },
   ],
-  personal: [
+  revisor: [
     { label: 'Solicitudes',       route: '/home/solicitudes',     icon: 'inbox'         },
     { label: 'Recursos',          route: '/home/recursos',        icon: 'package'       },
     { label: 'Reposiciones',      route: '/home/reposiciones',    icon: 'refresh'       },
   ],
-  administrador: [
+  admin: [
     { label: 'Dashboard',         route: '/home/dashboard',       icon: 'chart'         },
     { label: 'Solicitudes',       route: '/home/solicitudes',     icon: 'inbox'         },
     { label: 'Inventario',        route: '/home/recursos',        icon: 'package'       },
@@ -37,9 +37,8 @@ ROLE_MENUS['admin'] = ROLE_MENUS['administrador'];
 
 const ROLE_LABELS: Record<string, string> = {
   alumno:        'Alumno',
-  personal:      'Personal',
-  administrador: 'Administración Central',
-  admin:         'Administración Central',
+  revisor:      'Personal',
+  admin: 'Administrador',
   guardia:       'Guardia',
 };
 

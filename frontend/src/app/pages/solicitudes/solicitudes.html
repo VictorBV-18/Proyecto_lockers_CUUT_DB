@@ -1,107 +1,273 @@
-<div class="page-header">
-  <h1 class="page-title">Bandeja de Solicitudes</h1>
-  <p class="page-desc">Gestiona y revisa las solicitudes de los alumnos.</p>
+<div class="solicitudes">
+
+  <!-- Breadcrumb -->
+  <nav class="breadcrumb" aria-label="Ruta de navegación">
+    <a href="#">Portal</a>
+    <span class="breadcrumb__sep">/</span>
+    <span class="breadcrumb__current">Solicitudes</span>
+  </nav>
+
+  <!-- Encabezado -->
+  <header class="page-head">
+    <div>
+      <h2 class="page-head__title">Gestión de Solicitudes</h2>
+      <p class="page-head__subtitle">Gestiona y revisa las solicitudes recibidas.</p>
+    </div>
+  </header>
+
+  <!-- Panel de tabla -->
+  <section class="panel">
+    <div class="panel__toolbar">
+      <div class="toolbar__left">
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+          <input type="text" placeholder="Filtrar por folio..." />
+        </div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Folio</th>
+            <th>Alumno</th>
+            <th>Tipo de Solicitud</th>
+            <th>Fecha</th>
+            <th>Estado</th>
+            <th class="th-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (sol of this.peticionesPersonal.todasLasSolicitudes(); track sol.id_solicitud) {
+            <tr>
+              <td class="td-folio">{{ sol.folio }}</td>
+              <td>
+                <div class="td-alumno">
+                  <span class="td-alumno__name">{{ sol.nombre_completo }}</span>
+                  <span class="td-alumno__cuenta">{{ sol.numero_cuenta }}</span>
+                </div>
+              </td>
+              <td>Solicitud de {{ sol.tipo_tramite }}</td>
+              <td class="td-muted">{{ formatearFecha(sol.fecha_solicitud) }}</td>
+              <td>
+                <span class="badge" [ngClass]="'badge--' + getClaseEstado(sol.estado)">
+                  <i class="dot"></i>{{ sol.estado }}
+                </span>
+              </td>
+              <td class="td-actions">
+                <button
+                  type="button"
+                  class="icon-btn"
+                  aria-label="Revisar documentos"
+                  title="Revisar documentos"
+                  (click)="verSolicitud(sol)"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                       stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                </button>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="6" style="text-align:center; padding: 40px; color: var(--text-muted);">
+                No hay solicitudes pendientes.
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
 </div>
 
-<!-- Filtros -->
-<div class="filters-bar">
-  <div class="filter-group">
-    <input
-      type="text"
-      class="filter-input filter-input--search"
-      placeholder="Buscar por nombre, matrícula o folio..."
-      [(ngModel)]="filtroBusqueda"
-      (input)="aplicarFiltros()"
-    />
-  </div>
-  <div class="filter-group">
-    <select class="filter-input" [(ngModel)]="filtroEstado" (change)="aplicarFiltros()">
-      <option value="">Todos los estados</option>
-      <option *ngFor="let e of estados" [value]="e">{{ getEstadoTexto(e) }}</option>
-    </select>
-  </div>
-  <div class="filter-group">
-    <input
-      type="date"
-      class="filter-input"
-      [(ngModel)]="filtroFecha"
-      (change)="aplicarFiltros()"
-    />
-  </div>
-  <button class="btn btn--ghost" (click)="limpiarFiltros()">Limpiar</button>
-</div>
+<!-- ======================================================
+     Modal: Revisión de documentos
+     ====================================================== -->
+@if (modalAbierto) {
+  <div class="modal-backdrop" (click)="cerrarModal()">
+    <div class="modal-panel" (click)="$event.stopPropagation()">
 
-<!-- Tabla -->
-<div class="table-card">
-  <div class="table-wrapper">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Folio</th>
-          <th>Alumno</th>
-          <th>Matrícula</th>
-          <th>Tipo</th>
-          <th>Fecha</th>
-          <th>Estado</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let s of solicitudesFiltradas">
-          <td class="td-folio">{{ s.folio }}</td>
-          <td>{{ s.nombre_completo }}</td>
-          <td>{{ s.numero_cuenta }}</td>
-          <td>{{ getTramiteTexto(s.tipo_tramite) }}</td>
-          <td>{{ formatearFecha(s.fecha_solicitud) }}</td>
-          <td>
-            <span class="badge" [ngClass]="getEstadoClase(s.estado)">
-              {{ getEstadoTexto(s.estado) }}
-            </span>
-          </td>
-          <td>
-            <button
-              class="btn btn--danger btn--sm"
-              (click)="abrirModalCancelar(s)"
-              [disabled]="s.estado === 'APROBADA' || s.estado === 'DOCUMENTACION_INCORRECTA'"
-            >
-              Cancelar
-            </button>
-          </td>
-        </tr>
-        <tr *ngIf="solicitudesFiltradas.length === 0">
-          <td colspan="7" class="td-empty">No se encontraron solicitudes.</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</div>
+      <!-- Cabecera -->
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Revisión de Documentos</h3>
+          @if (solicitudDetalle) {
+            <p class="modal-subtitle">
+              FOL-{{ solicitudDetalle.id_solicitud.toString().padStart(4, '0') }}
+              &middot; {{ getTipoLabel(solicitudDetalle.tipo_tramite) }}
+              &middot; {{ solicitudDetalle.nombre_completo }}
+            </p>
+          }
+        </div>
+        <button class="modal-close" (click)="cerrarModal()" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6 6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
 
-<!-- Modal Cancelar -->
-<div class="modal-overlay" *ngIf="mostrarModalCancelar" (click)="cerrarModalCancelar()">
-  <div class="modal-content" (click)="$event.stopPropagation()">
-    <div class="modal-header">
-      <h3 class="modal-title">Cancelar Documento</h3>
-      <button class="modal-close" (click)="cerrarModalCancelar()">&times;</button>
-    </div>
-    <div class="modal-body">
-      <p class="modal-text">
-        Estás por rechazar la solicitud
-        <strong>{{ solicitudSeleccionada?.folio }}</strong>
-        de <strong>{{ solicitudSeleccionada?.nombre_completo }}</strong>.
-      </p>
-      <label class="field-label">Motivo de cancelación *</label>
-      <textarea
-        class="field-textarea"
-        [(ngModel)]="motivoCancelacion"
-        placeholder="Escribe el motivo de cancelación..."
-        rows="4"
-        [class.field-error]="errorMotivo"
-      ></textarea>
-      <p class="error-text" *ngIf="errorMotivo">El motivo es obligatorio.</p>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn--ghost" (click)="cerrarModalCancelar()">Cancelar</button>
-      <button class="btn btn--danger" (click)="confirmarCancelacion()">Confirmar Rechazo</button>
-    </div>
-  </div>
-</div>
+      <!-- Cuerpo -->
+      <div class="modal-body">
+
+        @if (cargandoModal) {
+          <div class="modal-loading">
+            <span class="spinner"></span>
+            Cargando documentos…
+          </div>
+        } @else if (solicitudDetalle) {
+              
+          <!-- Info de la solicitud -->
+          <div class="modal-info-row">
+            <div class="modal-info-item">
+              <span class="label-muted">Estado</span>
+              <span class="badge" [ngClass]="'badge--' + getClaseEstado(solicitudDetalle.estado)">
+                <i class="dot"></i>{{ solicitudDetalle.estado }}
+              </span>
+            </div>
+            <div class="modal-info-item">
+              <span class="label-muted">Número de cuenta</span>
+              <span class="info-value">{{ solicitudDetalle.numero_cuenta }}</span>
+            </div>
+            <div class="modal-info-item">
+              <span class="label-muted">Fecha</span>
+              <span class="info-value">{{ formatearFecha(solicitudDetalle.fecha_solicitud) }}</span>
+            </div>
+          </div>
+
+          <!-- Lista de documentos -->
+          @if (solicitudDetalle.documentos.length === 0) {
+            <p class="modal-empty">Esta solicitud no tiene documentos adjuntos.</p>
+          } @else {
+            <ul class="doc-list">
+              @for (doc of solicitudDetalle.documentos; track doc.id_documento) {
+                <li class="doc-item"
+                    [class.doc-item--aprobado]="doc.estado_documento === 'APROBADO'"
+                    [class.doc-item--rechazado]="doc.estado_documento === 'RECHAZADO'">
+
+                  <!-- Cabecera del documento -->
+                  <div class="doc-item__top">
+                    <div class="doc-item__icon-wrap">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+                           stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+                      </svg>
+                    </div>
+
+                    <div class="doc-item__info">
+                      <span class="doc-item__name">{{ doc.nombre_tipo_documento }}</span>
+                      <span class="badge badge--sm" [ngClass]="'badge--' + getClaseEstado(doc.estado_documento)">
+                        <i class="dot"></i>{{ doc.estado_documento }}
+                      </span>
+                    </div>
+
+                    <!-- Checkmark si APROBADO -->
+                    @if (doc.estado_documento === 'APROBADO') {
+                      <div class="doc-item__check" title="Documento aprobado">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                             stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M20 6 9 17l-5-5"/>
+                        </svg>
+                      </div>
+                    }
+
+                    <!-- X si RECHAZADO -->
+                    @if (doc.estado_documento === 'RECHAZADO') {
+                      <div class="doc-item__x" title="Documento rechazado">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                             stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M18 6 6 18M6 6l12 12"/>
+                        </svg>
+                      </div>
+                    }
+                  </div>
+
+                  <!-- Motivo de rechazo (ya guardado) -->
+                  @if (doc.estado_documento === 'RECHAZADO' && doc.comentario_admin && !rechazandoDoc[doc.id_documento]) {
+                    <div class="doc-reject-info">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                           stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 8v4m0 4h.01"/>
+                      </svg>
+                      <span>{{ doc.comentario_admin }}</span>
+                    </div>
+                  }
+
+                  <!-- Acciones del revisor -->
+                  @if (doc.estado_documento === 'PENDIENTE' && !rechazandoDoc[doc.id_documento]) {
+                    <div class="doc-actions">
+                      <button
+                        class="btn-aprobar"
+                        [disabled]="procesandoDoc[doc.id_documento]"
+                        (click)="aprobarDocumento(doc.id_documento)"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                             stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M20 6 9 17l-5-5"/>
+                        </svg>
+                        {{ procesandoDoc[doc.id_documento] ? 'Procesando…' : 'Aprobar' }}
+                      </button>
+                      <button
+                        class="btn-rechazar"
+                        [disabled]="procesandoDoc[doc.id_documento]"
+                        (click)="iniciarRechazo(doc.id_documento)"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                             stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M18 6 6 18M6 6l12 12"/>
+                        </svg>
+                        Rechazar
+                      </button>
+                    </div>
+                  }
+
+                  <!-- Formulario de rechazo inline -->
+                  @if (rechazandoDoc[doc.id_documento]) {
+                    <div class="doc-reject-form">
+                      <label class="reject-label">Motivo del rechazo</label>
+                      <textarea
+                        class="reject-textarea"
+                        rows="3"
+                        placeholder="Describe el motivo por el que se rechaza este documento…"
+                        [(ngModel)]="motivoRechazo[doc.id_documento]"
+                        [disabled]="procesandoDoc[doc.id_documento]"
+                      ></textarea>
+                      <div class="reject-form-actions">
+                        <button
+                          class="btn-confirmar-rechazo"
+                          [disabled]="procesandoDoc[doc.id_documento] || !motivoRechazo[doc.id_documento]?.trim()"
+                          (click)="confirmarRechazo(doc.id_documento)"
+                        >
+                          {{ procesandoDoc[doc.id_documento] ? 'Procesando…' : 'Confirmar rechazo' }}
+                        </button>
+                        <button
+                          class="btn-cancelar"
+                          [disabled]="procesandoDoc[doc.id_documento]"
+                          (click)="cancelarRechazo(doc.id_documento)"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  }
+
+                </li>
+              }
+            </ul>
+          }
+
+        }
+      </div><!-- /modal-body -->
+    </div><!-- /modal-panel -->
+  </div><!-- /modal-backdrop -->
+}

@@ -1,6 +1,8 @@
-import { Component, OnInit } from '@angular/core';
-import { AdminService } from '../../../core/service/admin-service';
-import { SolicitudAdmin } from '../../../core/interfaces/admin-interfaces';
+import { ChangeDetectorRef, Component, inject } from '@angular/core';
+import { PersonalService } from '../../../core/service/personal-service';
+import { Solicitud, SolicitudDetalleRevisor } from '../../../core/interfaces/personalinterfaces';
+import { claseEstado, formatearFecha } from '../../../helpers/helpers';
+import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-solicitudes',
@@ -8,142 +10,139 @@ import { SolicitudAdmin } from '../../../core/interfaces/admin-interfaces';
   templateUrl: './solicitudes.html',
   styleUrl: './solicitudes.css',
 })
-export class Solicitudes implements OnInit {
-  solicitudes: SolicitudAdmin[] = [];
-  solicitudesFiltradas: SolicitudAdmin[] = [];
+export class Solicitudes {
+  peticionesPersonal = inject(PersonalService);
+  private cdr = inject(ChangeDetectorRef);
 
-  // Filtros
-  filtroBusqueda = '';
-  filtroEstado = '';
-  filtroFecha = '';
+  idAdmin = Number(localStorage.getItem('idAdmin')) || 0;
 
-  // Modal cancelar
-  mostrarModalCancelar = false;
-  solicitudSeleccionada: SolicitudAdmin | null = null;
-  motivoCancelacion = '';
-  errorMotivo = false;
+  modalAbierto = false;
+  cargandoModal = false;
+  solicitudDetalle: SolicitudDetalleRevisor | null = null;
 
-  estados = ['PENDIENTE', 'APROBADA', 'DOCUMENTACION_INCORRECTA', 'EN_REVISION'];
-
-  constructor(private adminService: AdminService) {}
+  rechazandoDoc: Record<number, boolean> = {};
+  motivoRechazo: Record<number, string> = {};
+  procesandoDoc: Record<number, boolean> = {};
 
   ngOnInit() {
-    this.cargarSolicitudes();
+    this.obtenerSolicitudes();
   }
 
-  cargarSolicitudes() {
-    this.adminService.obtenerTodasSolicitudes().subscribe({
-      next: (res) => {
-        this.solicitudes = res.solicitudes;
-        this.aplicarFiltros();
+  obtenerSolicitudes() {
+    this.peticionesPersonal.listarSolicitudes().subscribe();
+  }
+
+  verSolicitud(sol: Solicitud): void {
+    this.modalAbierto = true;
+    this.cargandoModal = true;
+    this.solicitudDetalle = null;
+    this.rechazandoDoc = {};
+    this.motivoRechazo = {};
+    this.procesandoDoc = {};
+
+    this.peticionesPersonal.obtenerDetalleSolicitud(sol.id_solicitud).subscribe({
+      next: (detalle) => {
+        this.solicitudDetalle = detalle;
+        this.cargandoModal = false;
+        this.cdr.detectChanges();
       },
-      error: (err) => console.error('Error cargando solicitudes:', err),
+      error: () => {
+        this.cargandoModal = false;
+        this.modalAbierto = false;
+        this.cdr.detectChanges();
+      },
     });
   }
 
-  aplicarFiltros() {
-    let resultado = [...this.solicitudes];
+  cerrarModal(): void {
+    this.modalAbierto = false;
+    this.solicitudDetalle = null;
+    this.rechazandoDoc = {};
+    this.motivoRechazo = {};
+    this.procesandoDoc = {};
+  }
 
-    if (this.filtroBusqueda.trim()) {
-      const busqueda = this.filtroBusqueda.toLowerCase();
-      resultado = resultado.filter(
-        (s) =>
-          s.nombre_completo.toLowerCase().includes(busqueda) ||
-          s.numero_cuenta.includes(busqueda) ||
-          s.folio.toLowerCase().includes(busqueda)
-      );
-    }
+  iniciarRechazo(idDocumento: number): void {
+    this.rechazandoDoc = { ...this.rechazandoDoc, [idDocumento]: true };
+    this.motivoRechazo = { ...this.motivoRechazo, [idDocumento]: '' };
+  }
 
-    if (this.filtroEstado) {
-      resultado = resultado.filter((s) => s.estado === this.filtroEstado);
-    }
+  cancelarRechazo(idDocumento: number): void {
+    this.rechazandoDoc = { ...this.rechazandoDoc, [idDocumento]: false };
+    this.motivoRechazo = { ...this.motivoRechazo, [idDocumento]: '' };
+  }
 
-    if (this.filtroFecha) {
-      resultado = resultado.filter((s) => {
-        const fechaSolicitud = new Date(s.fecha_solicitud).toISOString().split('T')[0];
-        return fechaSolicitud === this.filtroFecha;
+  aprobarDocumento(idDocumento: number): void {
+    if (!this.solicitudDetalle) return;
+
+    this.procesandoDoc = { ...this.procesandoDoc, [idDocumento]: true };
+
+    this.peticionesPersonal
+      .aprobarDocumento(this.solicitudDetalle.id_solicitud, idDocumento, this.idAdmin)
+      .subscribe({
+        next: () => {
+          this.actualizarEstadoDoc(idDocumento, 'APROBADO', null);
+          this.procesandoDoc = { ...this.procesandoDoc, [idDocumento]: false };
+          this.obtenerSolicitudes();
+        },
+        error: () => {
+          this.procesandoDoc = { ...this.procesandoDoc, [idDocumento]: false };
+          Swal.fire({ icon: 'error', title: 'Error al aprobar el documento', timer: 1500, showConfirmButton: false });
+        },
       });
+  }
+
+  confirmarRechazo(idDocumento: number): void {
+    const motivo = (this.motivoRechazo[idDocumento] || '').trim();
+    if (!motivo) {
+      Swal.fire({ icon: 'warning', title: 'Debes ingresar el motivo del rechazo.', timer: 1800, showConfirmButton: false });
+      return;
     }
+    if (!this.solicitudDetalle) return;
 
-    this.solicitudesFiltradas = resultado;
+    this.procesandoDoc = { ...this.procesandoDoc, [idDocumento]: true };
+
+    this.peticionesPersonal
+      .rechazarDocumento(this.solicitudDetalle.id_solicitud, idDocumento, this.idAdmin, motivo)
+      .subscribe({
+        next: () => {
+          this.actualizarEstadoDoc(idDocumento, 'RECHAZADO', motivo);
+          this.rechazandoDoc = { ...this.rechazandoDoc, [idDocumento]: false };
+          this.procesandoDoc = { ...this.procesandoDoc, [idDocumento]: false };
+          this.obtenerSolicitudes();
+        },
+        error: () => {
+          this.procesandoDoc = { ...this.procesandoDoc, [idDocumento]: false };
+          Swal.fire({ icon: 'error', title: 'Error al rechazar el documento', timer: 1500, showConfirmButton: false });
+        },
+      });
   }
 
-  limpiarFiltros() {
-    this.filtroBusqueda = '';
-    this.filtroEstado = '';
-    this.filtroFecha = '';
-    this.aplicarFiltros();
-  }
-
-  getEstadoClase(estado: string): string {
-    const mapa: Record<string, string> = {
-      PENDIENTE: 'badge--warning',
-      APROBADA: 'badge--success',
-      DOCUMENTACION_INCORRECTA: 'badge--danger',
-      RECHAZADA: 'badge--danger',
-      EN_REVISION: 'badge--info',
+  private actualizarEstadoDoc(
+    idDocumento: number,
+    estado: 'APROBADO' | 'RECHAZADO',
+    comentario: string | null,
+  ): void {
+    if (!this.solicitudDetalle) return;
+    this.solicitudDetalle = {
+      ...this.solicitudDetalle,
+      documentos: this.solicitudDetalle.documentos.map((d) =>
+        d.id_documento === idDocumento
+          ? { ...d, estado_documento: estado, comentario_admin: comentario }
+          : d,
+      ),
     };
-    return mapa[estado] || 'badge--muted';
   }
 
-  getEstadoTexto(estado: string): string {
-    const mapa: Record<string, string> = {
-      PENDIENTE: 'Pendiente',
-      APROBADA: 'Aprobada',
-      DOCUMENTACION_INCORRECTA: 'Doc. Incorrecta',
-      RECHAZADA: 'Rechazada',
-      EN_REVISION: 'En Revisión',
-    };
-    return mapa[estado] || estado;
-  }
-
-  getTramiteTexto(tipo: string): string {
-    return tipo === 'locker' ? 'Locker' : 'Estacionamiento';
+  getTipoLabel(tipo: string): string {
+    return tipo.charAt(0).toUpperCase() + tipo.slice(1).toLowerCase();
   }
 
   formatearFecha(fecha: string): string {
-    return new Date(fecha).toLocaleDateString('es-MX', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+    return formatearFecha(fecha);
   }
 
-  // ── Modal Cancelar ────────────────────────
-  abrirModalCancelar(solicitud: SolicitudAdmin) {
-    this.solicitudSeleccionada = solicitud;
-    this.motivoCancelacion = '';
-    this.errorMotivo = false;
-    this.mostrarModalCancelar = true;
-  }
-
-  cerrarModalCancelar() {
-    this.mostrarModalCancelar = false;
-    this.solicitudSeleccionada = null;
-    this.motivoCancelacion = '';
-    this.errorMotivo = false;
-  }
-
-  confirmarCancelacion() {
-    if (!this.motivoCancelacion.trim()) {
-      this.errorMotivo = true;
-      return;
-    }
-    this.errorMotivo = false;
-
-    if (this.solicitudSeleccionada) {
-      this.adminService
-        .rechazarSolicitud(this.solicitudSeleccionada.id_solicitud, {
-          id_admin: 1,
-          motivo: this.motivoCancelacion,
-        })
-        .subscribe({
-          next: () => {
-            this.cerrarModalCancelar();
-            this.cargarSolicitudes();
-          },
-          error: (err) => console.error('Error al cancelar:', err),
-        });
-    }
+  getClaseEstado(estado: string): string {
+    return claseEstado(estado);
   }
 }

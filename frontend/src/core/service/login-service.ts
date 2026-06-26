@@ -33,12 +33,15 @@ export class LoginService {
           const { rol } = response;
           localStorage.setItem('numeroCuenta', username);
           localStorage.setItem('rolUsuario', rol);
+          if (response.id_admin) {
+            localStorage.setItem('idAdmin', String(response.id_admin));
+          }
         }),
         catchError((error) => {
           Swal.fire({
             position: 'center',
             icon: 'error',
-            title: 'Error en el login',
+            title: `${error.detail}`,
             showConfirmButton: false,
             timer: 1500,
           });

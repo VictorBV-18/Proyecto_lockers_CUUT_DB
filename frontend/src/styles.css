@@ -10,6 +10,11 @@
   --danger:         #d64545;  /* rojo */
   --success:        #2a9d8f;  /* verde azulado */
   --warning:        #f4a261;  /* naranja */
+  --warning-ico:    #c97f3a;  /* naranja oscuro, para iconos sobre warning-bg */
+  --neutral-bg:     #eceeed;
+  --danger-bg:      #fbe7e7;
+  --success-bg:     #e3f4f1;
+  --warning-bg:     #fdecdd;
   /* Neutros derivados */
   --text:        #1f2a24;
   --text-soft:   #5b625d;

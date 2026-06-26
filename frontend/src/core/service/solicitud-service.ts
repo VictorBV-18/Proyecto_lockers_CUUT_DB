@@ -3,31 +3,24 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, of, throwError } from 'rxjs';
 import { catchError, delay, tap } from 'rxjs/operators';
 import {
+  FinalizarSolicitudResponse,
   MiSolicitudResponse,
   NuevaSolcitudResponse,
   NuevaSolicitudPayload,
   NuevaSolicitudResponse,
+  SolicitudesDetalladasResponse,
+  SolicitudesEstudiante,
   SolicitudResumen,
 } from '../interfaces/interfaces';
 import { environment } from '../../environment/environment';
 import Swal from 'sweetalert2';
 import { Router } from '@angular/router';
 
-/* 
-const HISTORIAL_INICIAL: SolicitudResumen[] = [
-{ id: '1', tipo: 'Permiso de Estacionamiento', folio: 'SOL-2026-0142', fecha: '08/06/2026', estado: 'en_revision' },
-{ id: '2', tipo: 'Obtención de Locker',        folio: 'SOL-2026-0098', fecha: '02/06/2026', estado: 'aprobada'    },
-  { id: '3', tipo: 'Permiso de Estacionamiento', folio: 'SOL-2025-0871', fecha: '14/12/2025', estado: 'rechazada'   },
-];
-*/
-
 @Injectable({
   providedIn: 'root',
 })
 export class SolicitudService {
   private API_URL = environment.apiUrl;
-
-  public misSolicitudes = signal<SolicitudResumen[]>([]);
 
   peticionError(error: string) {
     Swal.fire({
@@ -50,6 +43,9 @@ export class SolicitudService {
   }
 
   constructor(private http: HttpClient , private router:Router) {}
+
+  public misSolicitudes = signal<SolicitudResumen[]>([])
+  public misTramites = signal<SolicitudesEstudiante[]>([])
 
   crearSolicitud(payload: NuevaSolicitudPayload): Observable<NuevaSolcitudResponse> {
    
@@ -84,8 +80,19 @@ export class SolicitudService {
       );
   }
 
+  finalizarSolicitud(idSolicitud: number): Observable<FinalizarSolicitudResponse> {
+    return this.http
+      .post<FinalizarSolicitudResponse>(`${this.API_URL}/solicitudes/${idSolicitud}/enviar_solicitud`, {})
+      .pipe(
+        catchError(({ error }) => {
+          this.peticionError(error?.detail ?? 'Error al finalizar la solicitud');
+          return throwError(() => new Error('Error al finalizar la solicitud'));
+        }),
+      );
+  }
+
   editarSolicitud(): Observable<any> {
-    return this.http.put<any>(`${this.API_URL}/editar-solicitud}`, {}).pipe(
+    return this.http.put<any>(`${this.API_URL}/editar-solicitud`, {}).pipe(
       tap(() => console.log('Solicitud editada exitosamente')),
       catchError((error) => {
         this.peticionError(error);
@@ -99,11 +106,10 @@ export class SolicitudService {
   }
 
   listarMisSolicitudes(numeroCuenta: string): Observable<MiSolicitudResponse> {
-    return this.http.get<MiSolicitudResponse>(`${this.API_URL}/solicitudes/${numeroCuenta}`).pipe(
+    return this.http.get<MiSolicitudResponse>(`${this.API_URL}/solicitudes/${numeroCuenta}/general`).pipe(
       tap((response) => {
-        const { solicitudes } = response;
-        this.misSolicitudes.set(solicitudes);
-        console.log('Solicitudes obtenidas:', response);
+        const {tramites} = response
+        this.misTramites.set(tramites);
       }),
       catchError((error) => {
         this.peticionError(error);
@@ -112,7 +118,17 @@ export class SolicitudService {
     );
   }
 
+
   documentosSolicitados(numeroCuenta: string): Observable<any> {
     return this.http.get<any>(`${this.API_URL}/documentos-solicitados/`);
+  }
+
+  obtenerSolicitudesDetalladas(numeroCuenta: string): Observable<SolicitudesDetalladasResponse> {
+    return this.http.get<SolicitudesDetalladasResponse>(`${this.API_URL}/solicitudes/${numeroCuenta}`).pipe(
+      catchError(({ error }) => {
+        this.peticionError(error?.detail ?? 'Error al obtener los documentos');
+        return throwError(() => new Error('Error al obtener los documentos'));
+      }),
+    );
   }
 }
