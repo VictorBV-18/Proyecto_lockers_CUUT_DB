@@ -1,0 +1,70 @@
+<div class="page-header">
+  <h1 class="page-title">Configuración Operativa</h1>
+  <p class="page-desc">Gestiona los periodos de convocatoria y requisitos del sistema.</p>
+</div>
+
+<!-- Convocatoria -->
+<div class="config-card">
+  <h3 class="card-title">Gestión de Convocatorias</h3>
+  <p class="card-desc">Define el periodo activo para la recepción de solicitudes.</p>
+  <div class="date-grid">
+    <div class="date-field">
+      <label class="field-label">Fecha de Inicio</label>
+      <input type="date" class="field-input" [(ngModel)]="fechaInicio" />
+    </div>
+    <div class="date-field">
+      <label class="field-label">Fecha de Cierre</label>
+      <input type="date" class="field-input" [(ngModel)]="fechaCierre" />
+    </div>
+  </div>
+  <button class="btn btn--primary btn--mt">Guardar Periodo</button>
+</div>
+
+<!-- Requisitos -->
+<div class="config-card">
+  <div class="card-header-row">
+    <div>
+      <h3 class="card-title">Requisitos Documentales</h3>
+      <p class="card-desc">Documentos necesarios para los trámites.</p>
+    </div>
+  </div>
+
+  <!-- Agregar nuevo -->
+  <div class="add-row">
+    <input
+      type="text"
+      class="field-input"
+      placeholder="Nombre del requisito..."
+      [(ngModel)]="nuevoRequisitoNombre"
+    />
+    <select class="field-input field-input--sm" [(ngModel)]="nuevoRequisitoTramite">
+      <option value="ambos">Ambos</option>
+      <option value="locker">Locker</option>
+      <option value="estacionamiento">Estacionamiento</option>
+    </select>
+    <button class="btn btn--primary" (click)="agregarRequisito()">+ Agregar</button>
+  </div>
+
+  <!-- Lista -->
+  <div class="requisito-list">
+    <div class="requisito-item" *ngFor="let r of requisitos">
+      <div class="requisito-info">
+        <span class="requisito-nombre">{{ r.nombre }}</span>
+        <span class="requisito-tramite">{{ getTramiteTexto(r.tramiteAsociado) }}</span>
+      </div>
+      <div class="requisito-actions">
+        <label class="toggle">
+          <input type="checkbox" [checked]="r.obligatorio" (change)="toggleObligatorio(r)" />
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="toggle-label">{{ r.obligatorio ? 'Obligatorio' : 'Opcional' }}</span>
+        <button class="btn-icon-delete" (click)="eliminarRequisito(r.id)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div *ngIf="requisitos.length === 0" class="empty-msg">No hay requisitos configurados.</div>
+  </div>
+</div>

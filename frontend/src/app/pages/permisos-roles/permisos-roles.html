@@ -1,10 +1,67 @@
 <div class="page-header">
   <h1 class="page-title">Permisos y Roles</h1>
-  <p class="page-desc">Configura los permisos y roles de acceso al sistema.</p>
-</div>
-<div class="empty-card">
-  <div class="empty-icon">🛡️</div>
-  <p class="empty-title">Control de acceso</p>
-  <p class="empty-text">Esta sección está en desarrollo.</p>
+  <p class="page-desc">Gestiona los permisos de acceso y roles de los usuarios.</p>
 </div>
 
+<div class="table-card">
+  <div class="table-wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Correo</th>
+          <th>Rol</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let u of usuarios">
+          <td class="td-name">{{ u.nombre }}</td>
+          <td>{{ u.correo }}</td>
+          <td>{{ getRolTexto(u.rol) }}</td>
+          <td>
+            <span class="badge" [ngClass]="u.habilitado ? 'badge--success' : 'badge--muted'">
+              {{ u.habilitado ? 'Habilitado' : 'Deshabilitado' }}
+            </span>
+          </td>
+          <td>
+            <button class="btn btn--sm btn--outline" (click)="abrirModal(u)">Editar</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal Editar -->
+<div class="modal-overlay" *ngIf="mostrarModal" (click)="cerrarModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">Editar Usuario</h3>
+      <button class="modal-close" (click)="cerrarModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-text">
+        Editando a <strong>{{ usuarioSeleccionado?.nombre }}</strong>
+      </p>
+
+      <label class="field-label">Rol</label>
+      <select class="field-input" [(ngModel)]="nuevoRol">
+        <option *ngFor="let r of roles" [value]="r">{{ getRolTexto(r) }}</option>
+      </select>
+
+      <div class="toggle-group">
+        <label class="field-label">Cuenta habilitada</label>
+        <label class="toggle">
+          <input type="checkbox" [(ngModel)]="nuevoEstado" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn--ghost" (click)="cerrarModal()">Cancelar</button>
+      <button class="btn btn--primary" (click)="guardarCambios()">Guardar Cambios</button>
+    </div>
+  </div>
+</div>

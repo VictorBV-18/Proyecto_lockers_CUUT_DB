@@ -1,10 +1,153 @@
 <div class="page-header">
-  <h1 class="page-title">Recursos</h1>
-  <p class="page-desc">Administra los recursos disponibles (lockers, estacionamientos).</p>
-</div>
-<div class="empty-card">
-  <div class="empty-icon">📦</div>
-  <p class="empty-title">Sin recursos registrados</p>
-  <p class="empty-text">Agrega recursos para que los alumnos puedan solicitarlos.</p>
+  <h1 class="page-title">Inventario de Recursos</h1>
+  <p class="page-desc">Administra lockers y recursos del sistema.</p>
 </div>
 
+<!-- Tarjetas Resumen -->
+<div class="summary-grid">
+  <div class="summary-card">
+    <div class="summary-value">{{ totalLockers }}</div>
+    <div class="summary-label">Total Lockers</div>
+  </div>
+  <div class="summary-card summary-card--success">
+    <div class="summary-value">{{ disponibles }}</div>
+    <div class="summary-label">Disponibles</div>
+  </div>
+  <div class="summary-card summary-card--warning">
+    <div class="summary-value">{{ ocupados }}</div>
+    <div class="summary-label">Ocupados</div>
+  </div>
+  <div class="summary-card summary-card--muted">
+    <div class="summary-value">{{ mantenimiento }}</div>
+    <div class="summary-label">Mantenimiento</div>
+  </div>
+</div>
+
+<!-- Botones de Acción -->
+<div class="actions-bar">
+  <button class="btn btn--outline">
+    <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+    Importar CSV
+  </button>
+  <button class="btn btn--outline">
+    <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+    Exportar Excel
+  </button>
+  <button class="btn btn--primary" (click)="abrirModalNuevo()">
+    <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+    Nuevo Recurso
+  </button>
+  <button class="btn btn--danger-outline" (click)="abrirModalLiberacion()">
+    <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+    Liberación Masiva
+  </button>
+</div>
+
+<!-- Tabla Inventario -->
+<div class="table-card">
+  <div class="table-wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Ubicación / Zona</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let l of lockers">
+          <td class="td-code">{{ l.codigo_locker }}</td>
+          <td>{{ l.ubicacion }}</td>
+          <td>
+            <span class="badge" [ngClass]="getEstadoClase(l.estado)">{{ l.estado }}</span>
+          </td>
+          <td class="td-actions">
+            <button class="btn btn--sm btn--ghost" (click)="abrirModalEditar(l)">Editar</button>
+            <button class="btn btn--sm btn--outline-warning" (click)="abrirModalBaja(l, 'Mantenimiento')" [disabled]="l.estado === 'OCUPADO'">Mantenimiento</button>
+            <button class="btn btn--sm btn--outline-danger" (click)="abrirModalBaja(l, 'Dar de Baja')" [disabled]="l.estado === 'OCUPADO'">Dar de Baja</button>
+          </td>
+        </tr>
+        <tr *ngIf="lockers.length === 0">
+          <td colspan="4" class="td-empty">No hay lockers registrados.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal Nuevo / Editar Locker -->
+<div class="modal-overlay" *ngIf="mostrarModalLocker" (click)="cerrarModalLocker()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">{{ modoEdicion ? 'Editar Locker' : 'Nuevo Locker' }}</h3>
+      <button class="modal-close" (click)="cerrarModalLocker()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Código</label>
+      <input type="text" class="field-input" [(ngModel)]="lockerForm.codigo_locker" placeholder="Ej: LK-006" />
+
+      <label class="field-label">Ubicación</label>
+      <input type="text" class="field-input" [(ngModel)]="lockerForm.ubicacion" placeholder="Ej: Edificio A - Planta Baja" />
+
+      <label class="field-label">Estado</label>
+      <select class="field-input" [(ngModel)]="lockerForm.estado">
+        <option value="DISPONIBLE">Disponible</option>
+        <option value="OCUPADO">Ocupado</option>
+        <option value="MANTENIMIENTO">Mantenimiento</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn--ghost" (click)="cerrarModalLocker()">Cancelar</button>
+      <button class="btn btn--primary" (click)="guardarLocker()">{{ modoEdicion ? 'Guardar Cambios' : 'Crear Locker' }}</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Baja / Mantenimiento -->
+<div class="modal-overlay" *ngIf="mostrarModalBaja" (click)="cerrarModalBaja()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">{{ accionBaja }}</h3>
+      <button class="modal-close" (click)="cerrarModalBaja()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-text">
+        Vas a aplicar <strong>{{ accionBaja }}</strong> al locker
+        <strong>{{ lockerBaja?.codigo_locker }}</strong> ({{ lockerBaja?.ubicacion }}).
+      </p>
+      <label class="field-label">Motivo (para log de auditoría) *</label>
+      <textarea
+        class="field-textarea"
+        [(ngModel)]="motivoBaja"
+        placeholder="Ingresa el motivo..."
+        rows="3"
+        [class.field-error]="errorMotivoBaja"
+      ></textarea>
+      <p class="error-text" *ngIf="errorMotivoBaja">El motivo es obligatorio.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn--ghost" (click)="cerrarModalBaja()">Cancelar</button>
+      <button class="btn btn--danger" (click)="confirmarBaja()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Liberación Masiva -->
+<div class="modal-overlay" *ngIf="mostrarModalLiberacion" (click)="cerrarModalLiberacion()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">Liberación Masiva</h3>
+      <button class="modal-close" (click)="cerrarModalLiberacion()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-text">
+        Esta acción liberará todos los lockers ocupados. Es una operación irreversible.
+      </p>
+      <p class="modal-warning">⚠ Esta funcionalidad estará disponible cuando se implemente el endpoint correspondiente.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn--ghost" (click)="cerrarModalLiberacion()">Cerrar</button>
+    </div>
+  </div>
+</div>

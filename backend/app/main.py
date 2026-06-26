@@ -5,6 +5,8 @@ from app.api.rutas_alumno import router as rutas_alumno
 from app.api.rutas_administrador import router as rutas_administrador
 from app.api.rutas_notificaciones import router as rutas_notificaciones
 from app.api.rutas_guardia import router as rutas_guardia
+from app.api.rutas_inventarios import router as rutas_inventarios
+
 
 # Se crea la aplicacion principal
 app = FastAPI()
@@ -23,6 +25,8 @@ app.include_router(rutas_alumno)
 app.include_router(rutas_administrador)
 app.include_router(rutas_notificaciones)
 app.include_router(rutas_guardia)
+app.include_router(rutas_inventarios)
+
 
 @app.get("/")
 def ruta_de_prueba():

@@ -1,27 +1,112 @@
 <div class="page-header">
   <h1 class="page-title">Dashboard</h1>
-  <p class="page-desc">Resumen general del sistema de lockers y estacionamientos.</p>
+  <p class="page-desc">Monitoreo general del sistema de lockers y estacionamientos.</p>
 </div>
-<div class="stats-grid">
-  <div class="stat-card">
-    <div class="stat-icon">📊</div>
-    <div class="stat-value">—</div>
-    <div class="stat-label">Solicitudes activas</div>
+
+<!-- KPI Cards -->
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-icon kpi-icon--primary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 12h-6l-2 3H10l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+      </svg>
+    </div>
+    <div class="kpi-data">
+      <div class="kpi-value">{{ totalSolicitudes }}</div>
+      <div class="kpi-label">Total Solicitudes</div>
+    </div>
   </div>
-  <div class="stat-card">
-    <div class="stat-icon">👥</div>
-    <div class="stat-value">—</div>
-    <div class="stat-label">Usuarios registrados</div>
+
+  <div class="kpi-card">
+    <div class="kpi-icon kpi-icon--success">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3"/>
+      </svg>
+    </div>
+    <div class="kpi-data">
+      <div class="kpi-value">{{ tasaAprobacion }}%</div>
+      <div class="kpi-label">Tasa de Aprobación</div>
+    </div>
   </div>
-  <div class="stat-card">
-    <div class="stat-icon">🔒</div>
-    <div class="stat-value">—</div>
-    <div class="stat-label">Lockers ocupados</div>
+
+  <div class="kpi-card">
+    <div class="kpi-icon kpi-icon--warning">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+    </div>
+    <div class="kpi-data">
+      <div class="kpi-value">{{ solicitudesPendientes }}</div>
+      <div class="kpi-label">Pendientes</div>
+    </div>
   </div>
-  <div class="stat-card">
-    <div class="stat-icon">🚗</div>
-    <div class="stat-value">—</div>
-    <div class="stat-label">Cajones ocupados</div>
+
+  <div class="kpi-card">
+    <div class="kpi-icon kpi-icon--danger">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 6 6 18M6 6l12 12"/>
+      </svg>
+    </div>
+    <div class="kpi-data">
+      <div class="kpi-value">{{ solicitudesRechazadas }}</div>
+      <div class="kpi-label">Rechazadas</div>
+    </div>
   </div>
 </div>
 
+<!-- Gráficas -->
+<div class="charts-grid">
+  <div class="chart-card">
+    <h3 class="chart-title">Solicitudes de la semana</h3>
+    <div class="chart-container">
+      <canvas #barChart></canvas>
+    </div>
+  </div>
+  <div class="chart-card">
+    <h3 class="chart-title">Estado de trámites</h3>
+    <div class="chart-container">
+      <canvas #donutChart></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Resumen de Inventario -->
+<div class="section-header">
+  <h2 class="section-title">Resumen de Inventario</h2>
+</div>
+<div class="inventory-grid">
+  <div class="inventory-card" [class.inventory-card--alert]="alertaBajaDisponibilidad">
+    <div class="inventory-header">
+      <svg class="inventory-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16.5 9.4 7.55 4.24M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16zM3.27 6.96 12 12.01l8.73-5.05M12 22.08V12"/>
+      </svg>
+      <span class="inventory-label">Lockers</span>
+    </div>
+    <div class="inventory-stats">
+      <div class="inventory-stat">
+        <span class="inventory-stat-value">{{ totalLockers }}</span>
+        <span class="inventory-stat-label">Total</span>
+      </div>
+      <div class="inventory-stat">
+        <span class="inventory-stat-value inventory-stat-value--success">{{ lockersDisponibles }}</span>
+        <span class="inventory-stat-label">Disponibles</span>
+      </div>
+      <div class="inventory-stat">
+        <span class="inventory-stat-value inventory-stat-value--warning">{{ lockersOcupados }}</span>
+        <span class="inventory-stat-label">Ocupados</span>
+      </div>
+      <div class="inventory-stat">
+        <span class="inventory-stat-value inventory-stat-value--muted">{{ lockersMantenimiento }}</span>
+        <span class="inventory-stat-label">Mantenimiento</span>
+      </div>
+    </div>
+    <div class="inventory-bar">
+      <div class="inventory-bar-fill" [style.width.%]="porcentajeOcupacionLockers"
+           [class.bar-fill--danger]="alertaBajaDisponibilidad"></div>
+    </div>
+    <div class="inventory-bar-label">
+      <span>{{ porcentajeDisponible }}% disponible</span>
+      <span *ngIf="alertaBajaDisponibilidad" class="alert-badge">⚠ Baja disponibilidad</span>
+    </div>
+  </div>
+</div>

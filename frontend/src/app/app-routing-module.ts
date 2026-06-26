@@ -14,8 +14,10 @@ import { Reposiciones }   from './pages/reposiciones/reposiciones';
 import { AdminDashboard } from './pages/admin-dashboard/admin-dashboard';
 import { Usuarios }       from './pages/usuarios/usuarios';
 import { PermisosRoles }  from './pages/permisos-roles/permisos-roles';
-import { Verificacion }   from './pages/verificacion/verificacion';
-import { Notificaciones } from './pages/notificaciones/notificaciones';
+import { Verificacion }     from './pages/verificacion/verificacion';
+import { Notificaciones }   from './pages/notificaciones/notificaciones';
+import { AdminConfiguracion } from './pages/admin-configuracion/admin-configuracion';
+import { Auditoria }          from './pages/auditoria/auditoria';
 
 const routes: Routes = [
   { path: '',      redirectTo: 'login', pathMatch: 'full' },
@@ -34,6 +36,8 @@ const routes: Routes = [
       { path: 'permisos-roles',  component: PermisosRoles  },
       { path: 'verificacion',    component: Verificacion   },
       { path: 'notificaciones',  component: Notificaciones },
+      { path: 'configuracion',   component: AdminConfiguracion },
+      { path: 'auditoria',       component: Auditoria      },
     ],
   },
   { path: 'lockers',        component: Lockers        },
