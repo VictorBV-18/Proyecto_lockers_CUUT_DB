@@ -1,6 +1,8 @@
-import { ChangeDetectorRef, Component, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { PersonalService } from '../../../core/service/personal-service';
+import { AdminService } from '../../../core/service/admin-service';
 import { Solicitud, SolicitudDetalleRevisor } from '../../../core/interfaces/personalinterfaces';
+import { LockerItem } from '../../../core/interfaces/admin-interfaces';
 import { claseEstado, formatearFecha } from '../../../helpers/helpers';
 import Swal from 'sweetalert2';
 
@@ -12,18 +14,52 @@ import Swal from 'sweetalert2';
 })
 export class Solicitudes {
   peticionesPersonal = inject(PersonalService);
-  private cdr = inject(ChangeDetectorRef);
+  private adminService = inject(AdminService);
 
   idAdmin = Number(localStorage.getItem('idAdmin')) || 0;
 
-  modalAbierto = false;
-  cargandoModal = false;
-  solicitudDetalle: SolicitudDetalleRevisor | null = null;
+  // ── Signals (reactivos como useState en React) ────────────────
+  modalAbierto       = signal(false);
+  cargandoModal      = signal(false);
+  solicitudDetalle   = signal<SolicitudDetalleRevisor | null>(null);
 
-  rechazandoDoc: Record<number, boolean> = {};
+  rechazandoDoc      = signal<Record<number, boolean>>({});
+  procesandoDoc      = signal<Record<number, boolean>>({});
+
+  accionSolicitud    = signal<'idle' | 'seleccionando-locker' | 'rechazando'>('idle');
+  lockersDisponibles = signal<LockerItem[]>([]);
+  cargandoLockers    = signal(false);
+  procesandoSolicitud = signal(false);
+
+  // Propiedades normales solo para ngModel (actualizadas por el usuario, no async)
   motivoRechazo: Record<number, string> = {};
-  procesandoDoc: Record<number, boolean> = {};
+  lockerSeleccionado: number | null = null;
+  motivoRechazoSolicitud = '';
 
+  // ── Computed (derivados de signals, como useMemo) ─────────────
+  todosAprobados = computed(() => {
+    const det = this.solicitudDetalle();
+    if (!det || det.documentos.length === 0) return false;
+    return det.documentos.every(d => d.estado_documento === 'APROBADO');
+  });
+
+  hayRechazado = computed(() => {
+    const det = this.solicitudDetalle();
+    if (!det) return false;
+    return det.documentos.some(d => d.estado_documento === 'RECHAZADO');
+  });
+
+  solicitudFinalizada = computed(() => {
+    const det = this.solicitudDetalle();
+    if (!det) return true;
+    return ['APROBADA', 'DOCUMENTACION_INCORRECTA'].includes(det.estado);
+  });
+
+  mostrarPanelAccion = computed(() =>
+    !this.solicitudFinalizada() && (this.todosAprobados() || this.hayRechazado())
+  );
+
+  // ── Init ──────────────────────────────────────────────────────
   ngOnInit() {
     this.obtenerSolicitudes();
   }
@@ -32,64 +68,180 @@ export class Solicitudes {
     this.peticionesPersonal.listarSolicitudes().subscribe();
   }
 
+  // ── Modal ─────────────────────────────────────────────────────
   verSolicitud(sol: Solicitud): void {
-    this.modalAbierto = true;
-    this.cargandoModal = true;
-    this.solicitudDetalle = null;
-    this.rechazandoDoc = {};
+    this.modalAbierto.set(true);
+    this.cargandoModal.set(true);
+    this.solicitudDetalle.set(null);
+    this.rechazandoDoc.set({});
+    this.procesandoDoc.set({});
     this.motivoRechazo = {};
-    this.procesandoDoc = {};
+    this.resetAccionSolicitud();
 
     this.peticionesPersonal.obtenerDetalleSolicitud(sol.id_solicitud).subscribe({
       next: (detalle) => {
-        this.solicitudDetalle = detalle;
-        this.cargandoModal = false;
-        this.cdr.detectChanges();
+        this.solicitudDetalle.set(detalle);
+        this.cargandoModal.set(false);
       },
       error: () => {
-        this.cargandoModal = false;
-        this.modalAbierto = false;
-        this.cdr.detectChanges();
+        this.cargandoModal.set(false);
+        this.modalAbierto.set(false);
       },
     });
   }
 
   cerrarModal(): void {
-    this.modalAbierto = false;
-    this.solicitudDetalle = null;
-    this.rechazandoDoc = {};
+    this.modalAbierto.set(false);
+    this.solicitudDetalle.set(null);
+    this.rechazandoDoc.set({});
+    this.procesandoDoc.set({});
     this.motivoRechazo = {};
-    this.procesandoDoc = {};
+    this.resetAccionSolicitud();
   }
 
+  private resetAccionSolicitud(): void {
+    this.accionSolicitud.set('idle');
+    this.lockersDisponibles.set([]);
+    this.lockerSeleccionado = null;
+    this.cargandoLockers.set(false);
+    this.motivoRechazoSolicitud = '';
+    this.procesandoSolicitud.set(false);
+  }
+
+  // ── Aprobar solicitud ─────────────────────────────────────────
+  iniciarAprobacion(): void {
+    const det = this.solicitudDetalle();
+    if (!det) return;
+
+    if (det.tipo_tramite.toLowerCase() === 'locker') {
+      this.accionSolicitud.set('seleccionando-locker');
+      this.cargandoLockers.set(true);
+      this.adminService.obtenerInventarioLockers().subscribe({
+        next: (resp) => {
+          this.lockersDisponibles.set(resp.lockers_disponibles);
+          this.cargandoLockers.set(false);
+        },
+        error: () => {
+          this.cargandoLockers.set(false);
+          this.accionSolicitud.set('idle');
+          Swal.fire({ icon: 'error', title: 'Error al cargar lockers disponibles', timer: 1500, showConfirmButton: false });
+        },
+      });
+    } else {
+      this.aprobarEstacionamiento();
+    }
+  }
+
+  confirmarAprobacionLocker(): void {
+    const det = this.solicitudDetalle();
+    if (!det || !this.lockerSeleccionado) return;
+    this.procesandoSolicitud.set(true);
+
+    this.adminService.aprobarLocker(det.id_solicitud, {
+      id_admin: this.idAdmin,
+      id_locker: this.lockerSeleccionado,
+    }).subscribe({
+      next: () => {
+        this.solicitudDetalle.set({ ...det, estado: 'APROBADA' });
+        this.procesandoSolicitud.set(false);
+        this.resetAccionSolicitud();
+        this.obtenerSolicitudes();
+        Swal.fire({ icon: 'success', title: 'Solicitud de locker aprobada', timer: 1800, showConfirmButton: false });
+      },
+      error: (err) => {
+        this.procesandoSolicitud.set(false);
+        Swal.fire({ icon: 'error', title: err?.error?.detail || 'Error al aprobar la solicitud', timer: 2200, showConfirmButton: false });
+      },
+    });
+  }
+
+  private aprobarEstacionamiento(): void {
+    const det = this.solicitudDetalle();
+    if (!det) return;
+    this.procesandoSolicitud.set(true);
+
+    this.adminService.aprobarEstacionamiento(det.id_solicitud, { id_admin: this.idAdmin }).subscribe({
+      next: () => {
+        this.solicitudDetalle.set({ ...det, estado: 'APROBADA' });
+        this.procesandoSolicitud.set(false);
+        this.resetAccionSolicitud();
+        this.obtenerSolicitudes();
+        Swal.fire({ icon: 'success', title: 'Solicitud de estacionamiento aprobada', timer: 1800, showConfirmButton: false });
+      },
+      error: (err) => {
+        this.procesandoSolicitud.set(false);
+        Swal.fire({ icon: 'error', title: err?.error?.detail || 'Error al aprobar la solicitud', timer: 2200, showConfirmButton: false });
+      },
+    });
+  }
+
+  cancelarAprobacion(): void {
+    this.resetAccionSolicitud();
+  }
+
+  // ── Rechazar solicitud completa ───────────────────────────────
+  iniciarRechazoSolicitud(): void {
+    this.accionSolicitud.set('rechazando');
+    this.motivoRechazoSolicitud = '';
+  }
+
+  confirmarRechazoSolicitud(): void {
+    const motivo = this.motivoRechazoSolicitud.trim();
+    if (!motivo) {
+      Swal.fire({ icon: 'warning', title: 'Debes ingresar el motivo del rechazo.', timer: 1800, showConfirmButton: false });
+      return;
+    }
+    const det = this.solicitudDetalle();
+    if (!det) return;
+    this.procesandoSolicitud.set(true);
+
+    this.adminService.rechazarSolicitud(det.id_solicitud, { id_admin: this.idAdmin, motivo }).subscribe({
+      next: () => {
+        this.solicitudDetalle.set({ ...det, estado: 'DOCUMENTACION_INCORRECTA' });
+        this.procesandoSolicitud.set(false);
+        this.resetAccionSolicitud();
+        this.obtenerSolicitudes();
+        Swal.fire({ icon: 'success', title: 'Solicitud rechazada', timer: 1800, showConfirmButton: false });
+      },
+      error: (err) => {
+        this.procesandoSolicitud.set(false);
+        Swal.fire({ icon: 'error', title: err?.error?.detail || 'Error al rechazar la solicitud', timer: 2200, showConfirmButton: false });
+      },
+    });
+  }
+
+  cancelarRechazoSolicitud(): void {
+    this.accionSolicitud.set('idle');
+    this.motivoRechazoSolicitud = '';
+  }
+
+  // ── Acciones por documento ────────────────────────────────────
   iniciarRechazo(idDocumento: number): void {
-    this.rechazandoDoc = { ...this.rechazandoDoc, [idDocumento]: true };
+    this.rechazandoDoc.set({ ...this.rechazandoDoc(), [idDocumento]: true });
     this.motivoRechazo = { ...this.motivoRechazo, [idDocumento]: '' };
   }
 
   cancelarRechazo(idDocumento: number): void {
-    this.rechazandoDoc = { ...this.rechazandoDoc, [idDocumento]: false };
+    this.rechazandoDoc.set({ ...this.rechazandoDoc(), [idDocumento]: false });
     this.motivoRechazo = { ...this.motivoRechazo, [idDocumento]: '' };
   }
 
   aprobarDocumento(idDocumento: number): void {
-    if (!this.solicitudDetalle) return;
+    const det = this.solicitudDetalle();
+    if (!det) return;
+    this.procesandoDoc.set({ ...this.procesandoDoc(), [idDocumento]: true });
 
-    this.procesandoDoc = { ...this.procesandoDoc, [idDocumento]: true };
-
-    this.peticionesPersonal
-      .aprobarDocumento(this.solicitudDetalle.id_solicitud, idDocumento, this.idAdmin)
-      .subscribe({
-        next: () => {
-          this.actualizarEstadoDoc(idDocumento, 'APROBADO', null);
-          this.procesandoDoc = { ...this.procesandoDoc, [idDocumento]: false };
-          this.obtenerSolicitudes();
-        },
-        error: () => {
-          this.procesandoDoc = { ...this.procesandoDoc, [idDocumento]: false };
-          Swal.fire({ icon: 'error', title: 'Error al aprobar el documento', timer: 1500, showConfirmButton: false });
-        },
-      });
+    this.peticionesPersonal.aprobarDocumento(det.id_solicitud, idDocumento, this.idAdmin).subscribe({
+      next: () => {
+        this.actualizarEstadoDoc(idDocumento, 'APROBADO', null);
+        this.procesandoDoc.set({ ...this.procesandoDoc(), [idDocumento]: false });
+        this.obtenerSolicitudes();
+      },
+      error: () => {
+        this.procesandoDoc.set({ ...this.procesandoDoc(), [idDocumento]: false });
+        Swal.fire({ icon: 'error', title: 'Error al aprobar el documento', timer: 1500, showConfirmButton: false });
+      },
+    });
   }
 
   confirmarRechazo(idDocumento: number): void {
@@ -98,42 +250,36 @@ export class Solicitudes {
       Swal.fire({ icon: 'warning', title: 'Debes ingresar el motivo del rechazo.', timer: 1800, showConfirmButton: false });
       return;
     }
-    if (!this.solicitudDetalle) return;
+    const det = this.solicitudDetalle();
+    if (!det) return;
+    this.procesandoDoc.set({ ...this.procesandoDoc(), [idDocumento]: true });
 
-    this.procesandoDoc = { ...this.procesandoDoc, [idDocumento]: true };
-
-    this.peticionesPersonal
-      .rechazarDocumento(this.solicitudDetalle.id_solicitud, idDocumento, this.idAdmin, motivo)
-      .subscribe({
-        next: () => {
-          this.actualizarEstadoDoc(idDocumento, 'RECHAZADO', motivo);
-          this.rechazandoDoc = { ...this.rechazandoDoc, [idDocumento]: false };
-          this.procesandoDoc = { ...this.procesandoDoc, [idDocumento]: false };
-          this.obtenerSolicitudes();
-        },
-        error: () => {
-          this.procesandoDoc = { ...this.procesandoDoc, [idDocumento]: false };
-          Swal.fire({ icon: 'error', title: 'Error al rechazar el documento', timer: 1500, showConfirmButton: false });
-        },
-      });
+    this.peticionesPersonal.rechazarDocumento(det.id_solicitud, idDocumento, this.idAdmin, motivo).subscribe({
+      next: () => {
+        this.actualizarEstadoDoc(idDocumento, 'RECHAZADO', motivo);
+        this.rechazandoDoc.set({ ...this.rechazandoDoc(), [idDocumento]: false });
+        this.procesandoDoc.set({ ...this.procesandoDoc(), [idDocumento]: false });
+        this.obtenerSolicitudes();
+      },
+      error: () => {
+        this.procesandoDoc.set({ ...this.procesandoDoc(), [idDocumento]: false });
+        Swal.fire({ icon: 'error', title: 'Error al rechazar el documento', timer: 1500, showConfirmButton: false });
+      },
+    });
   }
 
-  private actualizarEstadoDoc(
-    idDocumento: number,
-    estado: 'APROBADO' | 'RECHAZADO',
-    comentario: string | null,
-  ): void {
-    if (!this.solicitudDetalle) return;
-    this.solicitudDetalle = {
-      ...this.solicitudDetalle,
-      documentos: this.solicitudDetalle.documentos.map((d) =>
-        d.id_documento === idDocumento
-          ? { ...d, estado_documento: estado, comentario_admin: comentario }
-          : d,
+  private actualizarEstadoDoc(idDocumento: number, estado: 'APROBADO' | 'RECHAZADO', comentario: string | null): void {
+    const det = this.solicitudDetalle();
+    if (!det) return;
+    this.solicitudDetalle.set({
+      ...det,
+      documentos: det.documentos.map(d =>
+        d.id_documento === idDocumento ? { ...d, estado_documento: estado, comentario_admin: comentario } : d
       ),
-    };
+    });
   }
 
+  // ── Helpers ───────────────────────────────────────────────────
   getTipoLabel(tipo: string): string {
     return tipo.charAt(0).toUpperCase() + tipo.slice(1).toLowerCase();
   }

@@ -91,7 +91,7 @@
 <!-- ======================================================
      Modal: Revisión de documentos
      ====================================================== -->
-@if (modalAbierto) {
+@if (modalAbierto()) {
   <div class="modal-backdrop" (click)="cerrarModal()">
     <div class="modal-panel" (click)="$event.stopPropagation()">
 
@@ -99,11 +99,11 @@
       <div class="modal-header">
         <div>
           <h3 class="modal-title">Revisión de Documentos</h3>
-          @if (solicitudDetalle) {
+          @if (solicitudDetalle()) {
             <p class="modal-subtitle">
-              FOL-{{ solicitudDetalle.id_solicitud.toString().padStart(4, '0') }}
-              &middot; {{ getTipoLabel(solicitudDetalle.tipo_tramite) }}
-              &middot; {{ solicitudDetalle.nombre_completo }}
+              FOL-{{ solicitudDetalle()!.id_solicitud.toString().padStart(4, '0') }}
+              &middot; {{ getTipoLabel(solicitudDetalle()!.tipo_tramite) }}
+              &middot; {{ solicitudDetalle()!.nombre_completo }}
             </p>
           }
         </div>
@@ -118,42 +118,41 @@
       <!-- Cuerpo -->
       <div class="modal-body">
 
-        @if (cargandoModal) {
+        @if (cargandoModal()) {
           <div class="modal-loading">
             <span class="spinner"></span>
             Cargando documentos…
           </div>
-        } @else if (solicitudDetalle) {
-              
+        } @else if (solicitudDetalle()) {
+
           <!-- Info de la solicitud -->
           <div class="modal-info-row">
             <div class="modal-info-item">
               <span class="label-muted">Estado</span>
-              <span class="badge" [ngClass]="'badge--' + getClaseEstado(solicitudDetalle.estado)">
-                <i class="dot"></i>{{ solicitudDetalle.estado }}
+              <span class="badge" [ngClass]="'badge--' + getClaseEstado(solicitudDetalle()!.estado)">
+                <i class="dot"></i>{{ solicitudDetalle()!.estado }}
               </span>
             </div>
             <div class="modal-info-item">
               <span class="label-muted">Número de cuenta</span>
-              <span class="info-value">{{ solicitudDetalle.numero_cuenta }}</span>
+              <span class="info-value">{{ solicitudDetalle()!.numero_cuenta }}</span>
             </div>
             <div class="modal-info-item">
               <span class="label-muted">Fecha</span>
-              <span class="info-value">{{ formatearFecha(solicitudDetalle.fecha_solicitud) }}</span>
+              <span class="info-value">{{ formatearFecha(solicitudDetalle()!.fecha_solicitud) }}</span>
             </div>
           </div>
 
           <!-- Lista de documentos -->
-          @if (solicitudDetalle.documentos.length === 0) {
+          @if (solicitudDetalle()!.documentos.length === 0) {
             <p class="modal-empty">Esta solicitud no tiene documentos adjuntos.</p>
           } @else {
             <ul class="doc-list">
-              @for (doc of solicitudDetalle.documentos; track doc.id_documento) {
+              @for (doc of solicitudDetalle()!.documentos; track doc.id_documento) {
                 <li class="doc-item"
                     [class.doc-item--aprobado]="doc.estado_documento === 'APROBADO'"
                     [class.doc-item--rechazado]="doc.estado_documento === 'RECHAZADO'">
 
-                  <!-- Cabecera del documento -->
                   <div class="doc-item__top">
                     <div class="doc-item__icon-wrap">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
@@ -170,7 +169,6 @@
                       </span>
                     </div>
 
-                    <!-- Checkmark si APROBADO -->
                     @if (doc.estado_documento === 'APROBADO') {
                       <div class="doc-item__check" title="Documento aprobado">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -180,7 +178,6 @@
                       </div>
                     }
 
-                    <!-- X si RECHAZADO -->
                     @if (doc.estado_documento === 'RECHAZADO') {
                       <div class="doc-item__x" title="Documento rechazado">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -191,8 +188,8 @@
                     }
                   </div>
 
-                  <!-- Motivo de rechazo (ya guardado) -->
-                  @if (doc.estado_documento === 'RECHAZADO' && doc.comentario_admin && !rechazandoDoc[doc.id_documento]) {
+                  <!-- Motivo de rechazo guardado -->
+                  @if (doc.estado_documento === 'RECHAZADO' && doc.comentario_admin && !rechazandoDoc()[doc.id_documento]) {
                     <div class="doc-reject-info">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
                            stroke-linecap="round" stroke-linejoin="round">
@@ -203,23 +200,23 @@
                     </div>
                   }
 
-                  <!-- Acciones del revisor -->
-                  @if (doc.estado_documento === 'PENDIENTE' && !rechazandoDoc[doc.id_documento]) {
+                  <!-- Botones aprobar / rechazar documento -->
+                  @if (doc.estado_documento === 'PENDIENTE' && !rechazandoDoc()[doc.id_documento]) {
                     <div class="doc-actions">
                       <button
                         class="btn-aprobar"
-                        [disabled]="procesandoDoc[doc.id_documento]"
+                        [disabled]="procesandoDoc()[doc.id_documento]"
                         (click)="aprobarDocumento(doc.id_documento)"
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
                              stroke-linecap="round" stroke-linejoin="round">
                           <path d="M20 6 9 17l-5-5"/>
                         </svg>
-                        {{ procesandoDoc[doc.id_documento] ? 'Procesando…' : 'Aprobar' }}
+                        {{ procesandoDoc()[doc.id_documento] ? 'Procesando…' : 'Aprobar' }}
                       </button>
                       <button
                         class="btn-rechazar"
-                        [disabled]="procesandoDoc[doc.id_documento]"
+                        [disabled]="procesandoDoc()[doc.id_documento]"
                         (click)="iniciarRechazo(doc.id_documento)"
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
@@ -232,7 +229,7 @@
                   }
 
                   <!-- Formulario de rechazo inline -->
-                  @if (rechazandoDoc[doc.id_documento]) {
+                  @if (rechazandoDoc()[doc.id_documento]) {
                     <div class="doc-reject-form">
                       <label class="reject-label">Motivo del rechazo</label>
                       <textarea
@@ -240,19 +237,19 @@
                         rows="3"
                         placeholder="Describe el motivo por el que se rechaza este documento…"
                         [(ngModel)]="motivoRechazo[doc.id_documento]"
-                        [disabled]="procesandoDoc[doc.id_documento]"
+                        [disabled]="procesandoDoc()[doc.id_documento]"
                       ></textarea>
                       <div class="reject-form-actions">
                         <button
                           class="btn-confirmar-rechazo"
-                          [disabled]="procesandoDoc[doc.id_documento] || !motivoRechazo[doc.id_documento]?.trim()"
+                          [disabled]="procesandoDoc()[doc.id_documento] || !motivoRechazo[doc.id_documento]?.trim()"
                           (click)="confirmarRechazo(doc.id_documento)"
                         >
-                          {{ procesandoDoc[doc.id_documento] ? 'Procesando…' : 'Confirmar rechazo' }}
+                          {{ procesandoDoc()[doc.id_documento] ? 'Procesando…' : 'Confirmar rechazo' }}
                         </button>
                         <button
                           class="btn-cancelar"
-                          [disabled]="procesandoDoc[doc.id_documento]"
+                          [disabled]="procesandoDoc()[doc.id_documento]"
                           (click)="cancelarRechazo(doc.id_documento)"
                         >
                           Cancelar
@@ -264,6 +261,117 @@
                 </li>
               }
             </ul>
+          }
+
+          <!-- ── Panel de acción sobre la solicitud completa ── -->
+          @if (mostrarPanelAccion()) {
+            <div class="sap">
+
+              <!-- Todos aprobados → botón aprobar -->
+              @if (todosAprobados() && accionSolicitud() === 'idle') {
+                <div class="sap-estado sap-estado--ok">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                       stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3"/>
+                  </svg>
+                  Todos los documentos han sido aprobados
+                </div>
+                <button class="btn-aprobar-solicitud" (click)="iniciarAprobacion()" [disabled]="procesandoSolicitud()">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                       stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 6 9 17l-5-5"/>
+                  </svg>
+                  {{ procesandoSolicitud() ? 'Procesando…' : 'Aprobar Solicitud' }}
+                </button>
+              }
+
+              <!-- Selección de locker -->
+              @if (accionSolicitud() === 'seleccionando-locker') {
+                <p class="sap-label">Selecciona el locker a asignar:</p>
+                @if (cargandoLockers()) {
+                  <div class="modal-loading">
+                    <span class="spinner"></span> Cargando lockers disponibles…
+                  </div>
+                } @else if (lockersDisponibles().length === 0) {
+                  <p class="sap-sin-lockers">No hay lockers disponibles en este momento.</p>
+                } @else {
+                  <select class="sap-select" [(ngModel)]="lockerSeleccionado">
+                    <option [ngValue]="null" disabled>— Elige un locker —</option>
+                    @for (lk of lockersDisponibles(); track lk.id_locker) {
+                      <option [ngValue]="lk.id_locker">{{ lk.codigo_locker }} · {{ lk.ubicacion }}</option>
+                    }
+                  </select>
+                }
+                <div class="sap-form-actions">
+                  <button
+                    class="btn-confirmar-solicitud"
+                    [disabled]="!lockerSeleccionado || procesandoSolicitud()"
+                    (click)="confirmarAprobacionLocker()"
+                  >
+                    {{ procesandoSolicitud() ? 'Procesando…' : 'Confirmar asignación' }}
+                  </button>
+                  <button class="btn-cancelar" [disabled]="procesandoSolicitud()" (click)="cancelarAprobacion()">
+                    Cancelar
+                  </button>
+                </div>
+              }
+
+              <!-- Hay rechazados → botón rechazar solicitud -->
+              @if (hayRechazado() && accionSolicitud() === 'idle') {
+                <div class="sap-estado sap-estado--warn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                       stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 8v4m0 4h.01"/>
+                  </svg>
+                  Hay documentos rechazados en esta solicitud
+                </div>
+                <button class="btn-rechazar-solicitud" (click)="iniciarRechazoSolicitud()" [disabled]="procesandoSolicitud()">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                       stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6 6 18M6 6l12 12"/>
+                  </svg>
+                  Rechazar Solicitud
+                </button>
+              }
+
+              <!-- Formulario de rechazo de la solicitud -->
+              @if (accionSolicitud() === 'rechazando') {
+                <div class="sap-reject-form">
+                  <label class="sap-label">Motivo de rechazo de la solicitud:</label>
+                  <textarea
+                    class="reject-textarea"
+                    rows="3"
+                    placeholder="Explica el motivo por el que se rechaza esta solicitud completa…"
+                    [(ngModel)]="motivoRechazoSolicitud"
+                    [disabled]="procesandoSolicitud()"
+                  ></textarea>
+                  <div class="sap-form-actions">
+                    <button
+                      class="btn-confirmar-rechazo"
+                      [disabled]="procesandoSolicitud() || !motivoRechazoSolicitud.trim()"
+                      (click)="confirmarRechazoSolicitud()"
+                    >
+                      {{ procesandoSolicitud() ? 'Procesando…' : 'Confirmar rechazo' }}
+                    </button>
+                    <button class="btn-cancelar" [disabled]="procesandoSolicitud()" (click)="cancelarRechazoSolicitud()">
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              }
+
+            </div>
+          }
+
+          <!-- Solicitud ya finalizada -->
+          @if (solicitudFinalizada()) {
+            <div class="sap-finalizada">
+              <span class="badge" [ngClass]="'badge--' + getClaseEstado(solicitudDetalle()!.estado)">
+                <i class="dot"></i>{{ solicitudDetalle()!.estado }}
+              </span>
+              <span class="sap-finalizada__texto">Esta solicitud ya fue procesada.</span>
+            </div>
           }
 
         }
