@@ -27,19 +27,16 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: 'Configuración',     route: '/home/configuracion',   icon: 'settings'      },
     { label: 'Auditoría',         route: '/home/auditoria',       icon: 'clipboard'     },
   ],
-  guardia: [
+  vigilante: [
     { label: 'Verificar Accesos', route: '/home/verificacion',    icon: 'check-circle'  },
   ],
 };
 
-// Alias: el backend devuelve 'admin' pero el mapa usa 'administrador'
-ROLE_MENUS['admin'] = ROLE_MENUS['administrador'];
-
 const ROLE_LABELS: Record<string, string> = {
-  alumno:        'Alumno',
-  revisor:      'Personal',
-  admin: 'Administrador',
-  guardia:       'Guardia',
+  alumno:     'Alumno',
+  revisor:    'Personal',
+  admin:      'Administrador',
+  vigilante:  'Guardia',
 };
 
 @Component({
