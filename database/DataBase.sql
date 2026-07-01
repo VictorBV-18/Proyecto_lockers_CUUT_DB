@@ -130,16 +130,25 @@ CREATE TABLE asignacion (
         REFERENCES locker(id_locker)
 );
 
+
 -- Tabla constancia
+-- Esta tabla cumple la funcion de documentos_emitidos
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 CREATE TABLE constancia (
     id_constancia SERIAL PRIMARY KEY,
     id_asignacion INT NOT NULL UNIQUE,
+    folio VARCHAR(50) NOT NULL UNIQUE,
+    qr_token UUID DEFAULT uuid_generate_v4() UNIQUE NOT NULL,
+    estado VARCHAR(20) DEFAULT 'VIGENTE',
     fecha_generacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    folio VARCHAR(30) NOT NULL UNIQUE,
+    vigencia DATE NOT NULL,
+    documento_path VARCHAR(255) NOT NULL,
     CONSTRAINT fk_constancia_asignacion
         FOREIGN KEY (id_asignacion)
         REFERENCES asignacion(id_asignacion)
 );
+
 
 -- Tabla notificaciones, para cuentas o roles completos
 CREATE TABLE notificaciones (
@@ -165,3 +174,5 @@ CREATE INDEX IF NOT EXISTS idx_busqueda_solicitud_alumno ON solicitud(id_alumno)
 CREATE INDEX IF NOT EXISTS idx_busqueda_solicitud_estado ON solicitud(estado);
 CREATE INDEX IF NOT EXISTS idx_notif_cuenta ON notificaciones(numero_cuenta);
 CREATE INDEX IF NOT EXISTS idx_notif_rol ON notificaciones(rol_destino);
+-- Busqueda rapida por QR
+CREATE INDEX IF NOT EXISTS idx_qr_token ON constancia(qr_token);

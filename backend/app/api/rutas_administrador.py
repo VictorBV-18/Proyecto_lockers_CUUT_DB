@@ -1,8 +1,12 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.db.conexion import conectar_base
-from app.utils.notificaciones import enviar_correo_rechazo 
+from app.utils.notificaciones import enviar_correo_rechazo, enviar_correo_documento
 from enum import Enum 
+from datetime import datetime, timedelta
+import os
+from fastapi.responses import FileResponse
+from app.utils.generador_pdf import generar_documento
 
 router = APIRouter()
 
@@ -20,6 +24,18 @@ class RechazarSolicitud(BaseModel):
     motivo: str
 
 
+class GenerarDocumentoRequest(BaseModel):
+    id_admin: int
+    meses_vigencia: int = 4
+
+class AprobarEstacionamiento(BaseModel):
+    id_admin: int
+    comentario: str | None = "Solicitud de estacionamiento aprobada."
+
+class AprobarLocker(BaseModel):
+    id_admin: int
+    id_locker: int
+    comentario: str | None = "Solicitud aprobada y locker asignado."
 
 
 
@@ -161,9 +177,6 @@ def obtener_todas_las_solicitudes(
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
 
-
-
-
 @router.put("/solicitudes/{id_solicitud}/documentos/{id_documento}", tags=["Administrador / Personal"], summary="Evaluar documento individual")
 def evaluar_documento_individual(
     id_solicitud: int,
@@ -227,10 +240,6 @@ def evaluar_documento_individual(
             conexion.rollback()
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
-
-
-
-
 
 
 @router.post("/solicitudes/{id_solicitud}/rechazar", tags=["Administrador / Personal"], summary="Rechazar solicitud completa y notificar via correo electronico")
@@ -318,3 +327,308 @@ def rechazar_solicitud(id_solicitud: int, datos: RechazarSolicitud):
             conexion.rollback()
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+
+
+# endpoint aprobar lockers
+@router.post("/solicitudes/{id_solicitud}/aprobar-locker", tags=["Administrador / Personal"], summary="Aprobar solicitud de locker y asignar")
+def aprobar_solicitud_locker(id_solicitud: int, datos: AprobarLocker):
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("""
+            SELECT s.id_solicitud, s.estado, s.tipo_tramite, a.numero_cuenta
+            FROM solicitud s JOIN alumno a ON s.id_alumno = a.id_alumno
+            WHERE s.id_solicitud = %s;
+        """, (id_solicitud,))
+        solicitud = cursor.fetchone()
+
+        if not solicitud:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+
+        estado_actual, tipo_tramite, numero_cuenta = solicitud[1], solicitud[2], solicitud[3]
+
+        if tipo_tramite.lower() != "locker":
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=400, detail="Esta solicitud no es de tipo locker.")
+
+        if estado_actual != "PENDIENTE":
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=400, detail=f"La solicitud no se puede aprobar porque está en estado {estado_actual}.")
+
+        cursor.execute("SELECT COUNT(*) FROM documentos_solicitud WHERE id_solicitud = %s AND estado != 'APROBADO';", (id_solicitud,))
+        if cursor.fetchone()[0] > 0:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=400, detail="No se puede aprobar la solicitud porque aún hay documentos sin aprobar.")
+
+        cursor.execute("SELECT id_locker, codigo_locker, ubicacion, estado FROM locker WHERE id_locker = %s;", (datos.id_locker,))
+        locker = cursor.fetchone()
+
+        if not locker:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=404, detail="Locker no encontrado.")
+
+        if locker[3] != "DISPONIBLE":
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=400, detail=f"El locker no está disponible. Estado actual: {locker[3]}.")
+
+        cursor.execute("UPDATE solicitud SET estado = 'APROBADA', revisado_por = %s, fecha_revision = CURRENT_TIMESTAMP WHERE id_solicitud = %s;", (datos.id_admin, id_solicitud))
+        
+        cursor.execute("INSERT INTO asignacion (id_solicitud, id_locker, estado) VALUES (%s, %s, 'ACTIVA') RETURNING id_asignacion;", (id_solicitud, datos.id_locker))
+        id_asignacion = cursor.fetchone()[0]
+
+        cursor.execute("UPDATE locker SET estado = 'OCUPADO' WHERE id_locker = %s;", (datos.id_locker,))
+        
+        cursor.execute("INSERT INTO historial_estados (id_solicitud, estado_anterior, estado_nuevo, id_admin, comentario) VALUES (%s, %s, %s, %s, %s);", (id_solicitud, estado_actual, "APROBADA", datos.id_admin, datos.comentario))
+        
+        cursor.execute("INSERT INTO notificaciones (numero_cuenta, rol_destino, titulo, mensaje) VALUES (%s, 'ALUMNO', 'Solicitud de locker aprobada', %s);", (numero_cuenta, f"Tu solicitud de locker fue aprobada. Se te asignó el locker {locker[1]} ubicado en {locker[2]}."))
+
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+
+        return {
+            "mensaje": "Solicitud de locker aprobada correctamente.",
+            "id_solicitud": id_solicitud,
+            "id_asignacion": id_asignacion,
+            "locker_asignado": {
+                "id_locker": locker[0],
+                "codigo_locker": locker[1],
+                "ubicacion": locker[2],
+                "estado": "OCUPADO"
+            },
+            "estado_solicitud": "APROBADA"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+
+
+# endpoint aprobar estacionamiento
+@router.post("/solicitudes/{id_solicitud}/aprobar-estacionamiento", tags=["Administrador / Personal"], summary="Aprobar solicitud de estacionamiento")
+def aprobar_solicitud_estacionamiento(id_solicitud: int, datos: AprobarEstacionamiento):
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+
+        cursor.execute("""
+            SELECT s.id_solicitud, s.estado, s.tipo_tramite, a.numero_cuenta
+            FROM solicitud s JOIN alumno a ON s.id_alumno = a.id_alumno
+            WHERE s.id_solicitud = %s;
+        """, (id_solicitud,))
+        solicitud = cursor.fetchone()
+
+        if not solicitud:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+
+        estado_actual, tipo_tramite, numero_cuenta = solicitud[1], solicitud[2], solicitud[3]
+
+        if tipo_tramite.lower() != "estacionamiento":
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=400, detail="Esta solicitud no es de tipo estacionamiento.")
+
+        if estado_actual != "PENDIENTE":
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=400, detail=f"La solicitud no se puede aprobar porque está en estado {estado_actual}.")
+
+        cursor.execute("SELECT COUNT(*) FROM documentos_solicitud WHERE id_solicitud = %s AND estado != 'APROBADO';", (id_solicitud,))
+        if cursor.fetchone()[0] > 0:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=400, detail="No se puede aprobar la solicitud porque aún hay documentos sin aprobar.")
+
+        cursor.execute("UPDATE solicitud SET estado = 'APROBADA', revisado_por = %s, fecha_revision = CURRENT_TIMESTAMP WHERE id_solicitud = %s;", (datos.id_admin, id_solicitud))
+        
+        # Crear asignación sin locker (NULL)
+        cursor.execute("INSERT INTO asignacion (id_solicitud, id_locker, estado) VALUES (%s, NULL, 'ACTIVA') RETURNING id_asignacion;", (id_solicitud,))
+        id_asignacion = cursor.fetchone()[0]
+        
+        cursor.execute("INSERT INTO historial_estados (id_solicitud, estado_anterior, estado_nuevo, id_admin, comentario) VALUES (%s, %s, %s, %s, %s);", (id_solicitud, estado_actual, "APROBADA", datos.id_admin, datos.comentario))
+        
+        cursor.execute("INSERT INTO notificaciones (numero_cuenta, rol_destino, titulo, mensaje) VALUES (%s, 'ALUMNO', 'Solicitud de estacionamiento aprobada', %s);", (numero_cuenta, "Tu solicitud de estacionamiento fue aprobada correctamente. Estás listo para generar tu tarjetón."))
+
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+
+        return {
+            "mensaje": "Solicitud de estacionamiento aprobada correctamente.",
+            "id_solicitud": id_solicitud,
+            "id_asignacion": id_asignacion,
+            "estado_solicitud": "APROBADA"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+
+
+@router.post("/solicitudes/{id_solicitud}/aceptar", tags=["Administrador / Personal"], summary="Aceptar solicitud completa, notificar via correo electronico y generar constancia o tarjeton con QR")
+def aceptar_solicitud_y_generar_documento(id_solicitud: int, datos: GenerarDocumentoRequest):
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+        
+        cursor.execute("""
+            SELECT a.id_asignacion, s.id_solicitud, s.tipo_tramite, s.estado, al.id_alumno, al.nombre, al.apellidos, al.numero_cuenta, al.correo_electronico, l.codigo_locker, l.ubicacion
+            FROM asignacion a
+            JOIN solicitud s ON a.id_solicitud = s.id_solicitud
+            JOIN alumno al ON s.id_alumno = al.id_alumno
+            LEFT JOIN locker l ON a.id_locker = l.id_locker
+            WHERE s.id_solicitud = %s AND a.estado = 'ACTIVA';
+        """, (id_solicitud,))
+        
+        info = cursor.fetchone()
+        if not info:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=400, detail="No se encontró una asignación activa para esta solicitud. Debes aprobar el recurso (locker/estacionamiento) primero.")
+            
+        id_asignacion, id_sol_bd, tipo_tramite, estado_solicitud, id_alumno, nombre_al, apellidos_al, num_cuenta, correo_alumno, cod_locker, ubi_locker = info
+        nombre_completo = f"{nombre_al} {apellidos_al}"
+        
+        cod_locker = cod_locker if cod_locker else "N/A"
+        ubi_locker = ubi_locker if ubi_locker else "N/A"
+
+        if estado_solicitud != 'APROBADA':
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=400, detail="La solicitud debe estar APROBADA para generar el documento.")
+
+        cursor.execute("SELECT id_constancia FROM constancia WHERE id_asignacion = %s;", (id_asignacion,))
+        if cursor.fetchone():
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=400, detail="Ya se generó un documento oficial para esta solicitud.")
+
+        fecha_vigencia_obj = datetime.now() + timedelta(days=30 * datos.meses_vigencia)
+        fecha_vigencia_str = fecha_vigencia_obj.strftime('%Y-%m-%d')
+        
+        folio = f"{tipo_tramite[:3].upper()}-{id_asignacion}-{datetime.now().strftime('%m%d')}"
+
+        cursor.execute("""
+            INSERT INTO constancia (id_asignacion, folio, vigencia, documento_path)
+            VALUES (%s, %s, %s, %s)
+            RETURNING qr_token, id_constancia;
+        """, (id_asignacion, folio, fecha_vigencia_str, 'pendiente.pdf'))
+        
+        resultado_insert = cursor.fetchone()
+        qr_token = str(resultado_insert[0])
+        
+        nombre_archivo_pdf = generar_documento(
+            folio=folio,
+            token_qr=qr_token,
+            nombre_alumno=nombre_completo,
+            cuenta_alumno=num_cuenta,
+            tipo_tramite=tipo_tramite,
+            vigencia=fecha_vigencia_str,
+            codigo_locker=cod_locker,
+            ubicacion_locker=ubi_locker
+        )
+        
+        cursor.execute("""
+            UPDATE constancia SET documento_path = %s WHERE id_asignacion = %s;
+        """, (nombre_archivo_pdf, id_asignacion))
+
+        cursor.execute("""
+            INSERT INTO historial_estados (id_solicitud, estado_anterior, estado_nuevo, id_admin, comentario)
+            VALUES (%s, 'APROBADA', 'DOCUMENTO_GENERADO', %s, %s)
+        """, (id_solicitud, datos.id_admin, f"Se generó el documento con folio {folio}."))
+        
+        correo_enviado = enviar_correo_documento(correo_alumno, nombre_completo, tipo_tramite, nombre_archivo_pdf)
+        
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+
+        mensaje_respuesta = "Solicitud aceptada y documento generado exitosamente."
+        if not correo_enviado:
+            mensaje_respuesta += " (Pero falló el envío de correo)."
+
+        return {
+            "mensaje": mensaje_respuesta,
+            "folio": folio,
+            "qr_token": qr_token,
+            "archivo": nombre_archivo_pdf
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD/Motor: {str(e)}")
+
+
+@router.get("/documentos/descargar/{qr_token}", tags=["Administrador / Personal", "Alumno"], summary="Descargar el PDF de un trámite")
+def descargar_documento(qr_token: str):
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+        
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("""
+            SELECT documento_path, estado FROM constancia WHERE qr_token = %s::uuid;
+        """, (qr_token,))
+        
+        resultado = cursor.fetchone()
+        cursor.close()
+        conexion.close()
+        
+        if not resultado:
+            raise HTTPException(status_code=404, detail="Documento no encontrado o código inválido.")
+            
+        archivo_path = resultado[0]
+        estado = resultado[1]
+        
+        if estado != 'VIGENTE':
+             raise HTTPException(status_code=400, detail=f"No se puede descargar. El documento está {estado}.")
+             
+        ruta_completa = os.path.join("uploads", archivo_path)
+        
+        if not os.path.exists(ruta_completa):
+            raise HTTPException(status_code=404, detail="El archivo físico ya no existe en el servidor.")
+            
+        return FileResponse(path=ruta_completa, filename=archivo_path, media_type='application/pdf')
+
+    except HTTPException:
+        raise
+    except ValueError:
+         raise HTTPException(status_code=400, detail="Formato de token inválido.")
+    except Exception as e:
+        if conexion:
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")

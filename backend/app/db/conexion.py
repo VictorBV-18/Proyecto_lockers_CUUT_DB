@@ -5,9 +5,9 @@ def conectar_base():
     try:
         conexion = psycopg2.connect(
             host="localhost",
-            database="Sistema_Gestor_Lokers_Estacionamiento_CUUT",
-            user="christianpenayanez",
-            password="", # Colocar tu contraseña de postgreSQL
+            database="postgres",
+            user="postgres",
+            password="141601",
             client_encoding="utf8"
         )
         return conexion

@@ -188,7 +188,7 @@ async def subir_documento(
 
 
 # Endpoint - FINALIZAR TRAMITE Valida que estén todos los PDFs
-@router.post("/solicitudes/{id_solicitud}/enviar_solicitud", tags=["Alumno"], summary="Finalizar solicitud completa y que los documentos han sido subidos completos")
+@router.post("/solicitudes/{id_solicitud}/enviar_solicitud", tags=["Alumno"], summary="Enviar solicitud completa y que los documentos han sido subidos completos")
 def finalizar_solicitud(id_solicitud: int):
     conexion = conectar_base()
     if conexion is None:
