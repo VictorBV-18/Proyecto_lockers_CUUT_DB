@@ -74,6 +74,18 @@ export interface AprobarEstacionamientoPayload {
   comentario?: string;
 }
 
+export interface AceptarSolicitudPayload {
+  id_admin: number;
+  meses_vigencia: number;
+}
+
+export interface AceptarSolicitudResponse {
+  mensaje: string;
+  folio: string;
+  qr_token: string;
+  archivo: string;
+}
+
 // Interfaces para datos mock
 export interface UsuarioMock {
   id: number;

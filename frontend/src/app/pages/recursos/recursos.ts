@@ -14,6 +14,8 @@ export class Recursos implements OnInit {
   disponibles = 0;
   ocupados = 0;
   mantenimiento = 0;
+  alertaBaja = false;
+  porcentajeDisponible = 0;
 
   // Tabla
   lockers: LockerItem[] = [];
@@ -46,6 +48,8 @@ export class Recursos implements OnInit {
         this.disponibles = res.disponibles;
         this.ocupados = res.ocupados;
         this.mantenimiento = res.mantenimiento;
+        this.alertaBaja = res.alerta_baja_disponibilidad;
+        this.porcentajeDisponible = res.porcentaje_disponible;
       },
     });
     this.adminService.listarTodosLockers().subscribe({
