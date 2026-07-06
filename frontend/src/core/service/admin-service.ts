@@ -13,6 +13,8 @@ import {
   RechazarSolicitudPayload,
   AprobarLockerPayload,
   AprobarEstacionamientoPayload,
+  AceptarSolicitudPayload,
+  AceptarSolicitudResponse,
 } from '../interfaces/admin-interfaces';
 
 @Injectable({
@@ -94,5 +96,21 @@ export class AdminService {
       `${this.API_URL}/solicitudes/${idSolicitud}/aprobar-estacionamiento`,
       datos
     );
+  }
+
+  // ── Sprint 5: Aceptar y generar documento ─────────────────────
+
+  aceptarSolicitud(
+    idSolicitud: number,
+    datos: AceptarSolicitudPayload
+  ): Observable<AceptarSolicitudResponse> {
+    return this.http.post<AceptarSolicitudResponse>(
+      `${this.API_URL}/solicitudes/${idSolicitud}/aceptar`,
+      datos
+    );
+  }
+
+  getUrlDescargaDocumento(qrToken: string): string {
+    return `${this.API_URL}/documentos/descargar/${qrToken}`;
   }
 }
