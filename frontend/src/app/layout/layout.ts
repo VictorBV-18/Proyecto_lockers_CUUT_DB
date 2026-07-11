@@ -12,11 +12,13 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
   alumno: [
     { label: 'Mis Solicitudes',   route: '/home/mis-solicitudes', icon: 'list'          },
     { label: 'Nueva Solicitud',   route: '/home/nueva-solicitud', icon: 'plus'          },
+    { label: 'Notificaciones',    route: '/home/notificaciones',  icon: 'bell'          },
   ],
   revisor: [
     { label: 'Solicitudes',       route: '/home/solicitudes',     icon: 'inbox'         },
     { label: 'Recursos',          route: '/home/recursos',        icon: 'package'       },
     { label: 'Reposiciones',      route: '/home/reposiciones',    icon: 'refresh'       },
+    { label: 'Notificaciones',    route: '/home/notificaciones',  icon: 'bell'          },
   ],
   admin: [
     { label: 'Dashboard',         route: '/home/dashboard',       icon: 'chart'         },

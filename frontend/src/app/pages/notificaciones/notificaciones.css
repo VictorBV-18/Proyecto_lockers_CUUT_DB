@@ -53,15 +53,15 @@
   border-radius: 16px;
   padding: 26px 30px;
   box-shadow: 0 1px 2px rgba(16, 34, 24, 0.04), 0 6px 20px -12px rgba(16, 34, 24, 0.10);
+  cursor: pointer;
+  opacity: 0.75;
 }
 
-/* Variantes por estado */
-.notif--danger {
-  border-left-color: var(--danger);
-}
-.notif--success {
+/* No leída: resaltada */
+.notif--unread {
   border-left-color: var(--primary);
   background: color-mix(in srgb, var(--primary) 5%, var(--white));
+  opacity: 1;
 }
 
 /* ---------- Icono ---------- */
@@ -74,8 +74,19 @@
   place-items: center;
 }
 .notif__icon svg { width: 26px; height: 26px; }
-.notif__icon--danger  { background: var(--danger-bg);  color: var(--danger); }
-.notif__icon--success { background: var(--success-bg); color: var(--success); }
+.notif__icon--read   { background: var(--neutral-bg); color: var(--neutral); }
+.notif__icon--unread { background: var(--success-bg); color: var(--primary); }
+
+/* ---------- Punto de "no leída" ---------- */
+.notif__dot {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--primary);
+}
 
 /* ---------- Cuerpo ---------- */
 .notif__body { flex: 1; min-width: 0; }
@@ -100,7 +111,6 @@
   font-size: 14px;
   color: var(--text-muted);
   white-space: nowrap;
-  padding-right: 26px; /* deja aire para el menú kebab */
 }
 .notif__time svg { width: 15px; height: 15px; }
 
@@ -111,76 +121,6 @@
   max-width: 880px;
 }
 
-/* ---------- Acciones ---------- */
-.notif__actions { margin-top: 18px; }
-
-.btn-outline {
-  display: inline-flex;
-  align-items: center;
-  padding: 11px 22px;
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius-field);
-  background: var(--white);
-  font-family: var(--font);
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text);
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
-}
-.btn-outline:hover { border-color: var(--primary); color: var(--primary); }
-
-.link-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  border: none;
-  background: transparent;
-  padding: 0;
-  font-family: var(--font);
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--primary);
-  cursor: pointer;
-}
-.link-action svg { width: 18px; height: 18px; }
-.link-action:hover { color: var(--primary-dark); }
-
-/* ---------- Menú kebab ---------- */
-.notif__menu {
-  position: absolute;
-  top: 50%;
-  right: 22px;
-  transform: translateY(-50%);
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: var(--neutral);
-  padding: 6px;
-  border-radius: 8px;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-.notif__menu svg { width: 20px; height: 20px; display: block;}
-.notif__menu:hover { background: #eef3f0; color: var(--text); }
-
-/* ---------- Cargar más ---------- */
-.notif-more {
-  display: flex;
-  justify-content: center;
-  margin-top: 36px;
-}
-.link-more {
-  border: none;
-  background: transparent;
-  font-family: var(--font);
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text);
-  cursor: pointer;
-  padding: 8px 4px;
-}
-.link-more:hover { color: var(--primary); }
-
 /* ---------- Responsive ---------- */
 @media (max-width: 720px) {
   .notificaciones { padding: 24px 18px 36px; }
@@ -188,5 +128,4 @@
   .notif { padding: 20px 18px; gap: 14px; }
   .notif__head { flex-direction: column; gap: 4px; }
   .notif__time { padding-right: 0; }
-  .notif__menu { top: 18px; transform: none; right: 14px; }
 }

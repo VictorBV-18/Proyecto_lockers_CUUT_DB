@@ -100,3 +100,15 @@ export interface SolicitudesDetalladasResponse {
   numero_cuenta: string;
   solicitudes: SolicitudDetallada[];
 }
+
+export interface Notificacion {
+  id_notificacion: number;
+  titulo: string;
+  mensaje: string;
+  leida: boolean;
+  fecha: string;
+}
+
+export interface NotificacionesResponse {
+  notificaciones: Notificacion[];
+}

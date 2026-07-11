@@ -85,3 +85,28 @@ export interface AceptarSolicitudResponse {
   qr_token: string;
   archivo: string;
 }
+
+// Interfaces para datos mock
+export interface UsuarioMock {
+  id: number;
+  nombre: string;
+  correo: string;
+  rol: string;
+  estado: string;
+  ultimoAcceso: string;
+}
+
+export interface AuditoriaMock {
+  id: number;
+  fecha: string;
+  usuario: string;
+  accion: string;
+  descripcion: string;
+}
+
+export interface RequisitoMock {
+  id: number;
+  nombre: string;
+  obligatorio: boolean;
+  tramiteAsociado: string;
+}
