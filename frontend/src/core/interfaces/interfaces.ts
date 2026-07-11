@@ -73,10 +73,11 @@ export interface MiSolicitudResponse {
 
 export interface SolicitudesEstudiante{
   estado_solicitud: string
-fecha_solicitud:string
-folio: string
-id_solicitud: string
-tipo_tramite :string
+  fecha_solicitud: string
+  folio: string
+  id_solicitud: string
+  tipo_tramite: string
+  qr_token?: string
 }
 
 export interface DocumentoDetalle {

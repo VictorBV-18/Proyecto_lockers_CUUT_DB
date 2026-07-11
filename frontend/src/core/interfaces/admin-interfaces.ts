@@ -74,6 +74,11 @@ export interface AprobarEstacionamientoPayload {
   comentario?: string;
 }
 
+export interface AceptarSolicitudPayload {
+  id_admin: number;
+  meses_vigencia: number;
+}
+
 // Interfaces para datos mock
 export interface UsuarioMock {
   id: number;

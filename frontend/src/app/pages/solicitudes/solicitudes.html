@@ -18,15 +18,49 @@
   <!-- Panel de tabla -->
   <section class="panel">
     <div class="panel__toolbar">
-      <div class="toolbar__left">
-        <div class="search">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
-          <input type="text" placeholder="Filtrar por folio..." />
+      <div class="filters">
+        <div class="filter-group">
+          <label class="filter-label">Tipo</label>
+          <select class="filter-select" [(ngModel)]="filtroTipoInput" name="filtroTipo">
+            <option value="">Todos</option>
+            <option value="locker">Locker</option>
+            <option value="estacionamiento">Estacionamiento</option>
+          </select>
         </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Estado</label>
+          <select class="filter-select" [(ngModel)]="filtroEstadoInput" name="filtroEstado">
+            <option value="">Todos</option>
+            <option value="PENDIENTE">Pendiente</option>
+            <option value="EN_REVISION">En revisión</option>
+            <option value="APROBADA">Aprobada</option>
+            <option value="DOCUMENTACION_INCORRECTA">Doc. Incorrecta</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Fecha</label>
+          <input type="date" class="filter-date" [(ngModel)]="filtroFechaInput" name="filtroFecha" />
+        </div>
+
+        <button type="button" class="btn-aplicar" (click)="aplicarFiltros()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+          </svg>
+          Aplicar filtros
+        </button>
+
+        @if (hayFiltrosActivos()) {
+          <button type="button" class="btn-limpiar" (click)="limpiarFiltros()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 6 6 18M6 6l12 12"/>
+            </svg>
+            Limpiar
+          </button>
+        }
       </div>
     </div>
 
@@ -43,7 +77,7 @@
           </tr>
         </thead>
         <tbody>
-          @for (sol of this.peticionesPersonal.todasLasSolicitudes(); track sol.id_solicitud) {
+          @for (sol of solicitudesFiltradas(); track sol.id_solicitud) {
             <tr>
               <td class="td-folio">{{ sol.folio }}</td>
               <td>
@@ -302,13 +336,47 @@
                     }
                   </select>
                 }
+                <label class="sap-label" for="mesesVigenciaLocker">Meses de vigencia</label>
+                <input
+                  type="number"
+                  id="mesesVigenciaLocker"
+                  class="sap-select"
+                  min="1"
+                  [(ngModel)]="mesesVigencia"
+                  name="mesesVigenciaLocker"
+                />
                 <div class="sap-form-actions">
                   <button
                     class="btn-confirmar-solicitud"
-                    [disabled]="!lockerSeleccionado || procesandoSolicitud()"
+                    [disabled]="!lockerSeleccionado || !mesesVigencia || procesandoSolicitud()"
                     (click)="confirmarAprobacionLocker()"
                   >
                     {{ procesandoSolicitud() ? 'Procesando…' : 'Confirmar asignación' }}
+                  </button>
+                  <button class="btn-cancelar" [disabled]="procesandoSolicitud()" (click)="cancelarAprobacion()">
+                    Cancelar
+                  </button>
+                </div>
+              }
+
+              <!-- Confirmación de aprobación de estacionamiento -->
+              @if (accionSolicitud() === 'confirmando-estacionamiento') {
+                <label class="sap-label" for="mesesVigenciaEstacionamiento">Meses de vigencia</label>
+                <input
+                  type="number"
+                  id="mesesVigenciaEstacionamiento"
+                  class="sap-select"
+                  min="1"
+                  [(ngModel)]="mesesVigencia"
+                  name="mesesVigenciaEstacionamiento"
+                />
+                <div class="sap-form-actions">
+                  <button
+                    class="btn-confirmar-solicitud"
+                    [disabled]="!mesesVigencia || procesandoSolicitud()"
+                    (click)="confirmarAprobacionEstacionamiento()"
+                  >
+                    {{ procesandoSolicitud() ? 'Procesando…' : 'Confirmar aprobación' }}
                   </button>
                   <button class="btn-cancelar" [disabled]="procesandoSolicitud()" (click)="cancelarAprobacion()">
                     Cancelar

@@ -18,6 +18,46 @@ export class Solicitudes {
 
   idAdmin = Number(localStorage.getItem('idAdmin')) || 0;
 
+  // ── Filtros ───────────────────────────────────────────────────
+  filtroTipoInput   = '';
+  filtroEstadoInput = '';
+  filtroFechaInput  = '';
+
+  filtroTipo   = signal('');
+  filtroEstado = signal('');
+  filtroFecha  = signal('');
+
+  solicitudesFiltradas = computed(() => {
+    const tipo   = this.filtroTipo();
+    const estado = this.filtroEstado();
+    const fecha  = this.filtroFecha();
+    return this.peticionesPersonal.todasLasSolicitudes().filter(s => {
+      if (tipo   && s.tipo_tramite.toLowerCase() !== tipo)    return false;
+      if (estado && s.estado.toUpperCase()        !== estado) return false;
+      if (fecha  && !s.fecha_solicitud.startsWith(fecha))     return false;
+      return true;
+    });
+  });
+
+  hayFiltrosActivos = computed(() =>
+    !!this.filtroTipo() || !!this.filtroEstado() || !!this.filtroFecha()
+  );
+
+  aplicarFiltros(): void {
+    this.filtroTipo.set(this.filtroTipoInput);
+    this.filtroEstado.set(this.filtroEstadoInput);
+    this.filtroFecha.set(this.filtroFechaInput);
+  }
+
+  limpiarFiltros(): void {
+    this.filtroTipoInput   = '';
+    this.filtroEstadoInput = '';
+    this.filtroFechaInput  = '';
+    this.filtroTipo.set('');
+    this.filtroEstado.set('');
+    this.filtroFecha.set('');
+  }
+
   // ── Signals (reactivos como useState en React) ────────────────
   modalAbierto       = signal(false);
   cargandoModal      = signal(false);
@@ -26,7 +66,7 @@ export class Solicitudes {
   rechazandoDoc      = signal<Record<number, boolean>>({});
   procesandoDoc      = signal<Record<number, boolean>>({});
 
-  accionSolicitud    = signal<'idle' | 'seleccionando-locker' | 'rechazando'>('idle');
+  accionSolicitud    = signal<'idle' | 'seleccionando-locker' | 'confirmando-estacionamiento' | 'rechazando'>('idle');
   lockersDisponibles = signal<LockerItem[]>([]);
   cargandoLockers    = signal(false);
   procesandoSolicitud = signal(false);
@@ -35,6 +75,7 @@ export class Solicitudes {
   motivoRechazo: Record<number, string> = {};
   lockerSeleccionado: number | null = null;
   motivoRechazoSolicitud = '';
+  mesesVigencia = 4;
 
   // ── Computed (derivados de signals, como useMemo) ─────────────
   todosAprobados = computed(() => {
@@ -105,6 +146,7 @@ export class Solicitudes {
     this.lockerSeleccionado = null;
     this.cargandoLockers.set(false);
     this.motivoRechazoSolicitud = '';
+    this.mesesVigencia = 4;
     this.procesandoSolicitud.set(false);
   }
 
@@ -128,7 +170,7 @@ export class Solicitudes {
         },
       });
     } else {
-      this.aprobarEstacionamiento();
+      this.accionSolicitud.set('confirmando-estacionamiento');
     }
   }
 
@@ -142,11 +184,26 @@ export class Solicitudes {
       id_locker: this.lockerSeleccionado,
     }).subscribe({
       next: () => {
-        this.solicitudDetalle.set({ ...det, estado: 'APROBADA' });
-        this.procesandoSolicitud.set(false);
-        this.resetAccionSolicitud();
-        this.obtenerSolicitudes();
-        Swal.fire({ icon: 'success', title: 'Solicitud de locker aprobada', timer: 1800, showConfirmButton: false });
+        // Petición anidada: al aprobar el locker, se genera la constancia con QR y se notifica por correo.
+        this.adminService.aceptarSolicitud(det.id_solicitud, {
+          id_admin: this.idAdmin,
+          meses_vigencia: this.mesesVigencia,
+        }).subscribe({
+          next: () => {
+            this.solicitudDetalle.set({ ...det, estado: 'APROBADA' });
+            this.procesandoSolicitud.set(false);
+            this.resetAccionSolicitud();
+            this.obtenerSolicitudes();
+            Swal.fire({ icon: 'success', title: 'Solicitud de locker aprobada y notificada por correo', timer: 1800, showConfirmButton: false });
+          },
+          error: (err) => {
+            this.solicitudDetalle.set({ ...det, estado: 'APROBADA' });
+            this.procesandoSolicitud.set(false);
+            this.resetAccionSolicitud();
+            this.obtenerSolicitudes();
+            Swal.fire({ icon: 'warning', title: err?.error?.detail || 'Locker asignado, pero falló la generación del documento/correo', timer: 2500, showConfirmButton: false });
+          },
+        });
       },
       error: (err) => {
         this.procesandoSolicitud.set(false);
@@ -155,18 +212,33 @@ export class Solicitudes {
     });
   }
 
-  private aprobarEstacionamiento(): void {
+  confirmarAprobacionEstacionamiento(): void {
     const det = this.solicitudDetalle();
     if (!det) return;
     this.procesandoSolicitud.set(true);
 
     this.adminService.aprobarEstacionamiento(det.id_solicitud, { id_admin: this.idAdmin }).subscribe({
       next: () => {
-        this.solicitudDetalle.set({ ...det, estado: 'APROBADA' });
-        this.procesandoSolicitud.set(false);
-        this.resetAccionSolicitud();
-        this.obtenerSolicitudes();
-        Swal.fire({ icon: 'success', title: 'Solicitud de estacionamiento aprobada', timer: 1800, showConfirmButton: false });
+        // Petición anidada: al aprobar el estacionamiento, se genera el tarjetón con QR y se notifica por correo.
+        this.adminService.aceptarSolicitud(det.id_solicitud, {
+          id_admin: this.idAdmin,
+          meses_vigencia: this.mesesVigencia,
+        }).subscribe({
+          next: () => {
+            this.solicitudDetalle.set({ ...det, estado: 'APROBADA' });
+            this.procesandoSolicitud.set(false);
+            this.resetAccionSolicitud();
+            this.obtenerSolicitudes();
+            Swal.fire({ icon: 'success', title: 'Solicitud de estacionamiento aprobada y notificada por correo', timer: 1800, showConfirmButton: false });
+          },
+          error: (err) => {
+            this.solicitudDetalle.set({ ...det, estado: 'APROBADA' });
+            this.procesandoSolicitud.set(false);
+            this.resetAccionSolicitud();
+            this.obtenerSolicitudes();
+            Swal.fire({ icon: 'warning', title: err?.error?.detail || 'Estacionamiento aprobado, pero falló la generación del documento/correo', timer: 2500, showConfirmButton: false });
+          },
+        });
       },
       error: (err) => {
         this.procesandoSolicitud.set(false);
