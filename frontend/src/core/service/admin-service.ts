@@ -15,6 +15,7 @@ import {
   AprobarEstacionamientoPayload,
   AceptarSolicitudPayload,
   AceptarSolicitudResponse,
+
 } from '../interfaces/admin-interfaces';
 
 @Injectable({
@@ -97,20 +98,13 @@ export class AdminService {
       datos
     );
   }
-
-  // ── Sprint 5: Aceptar y generar documento ─────────────────────
-
+  // Genera la constancia/tarjetón con QR y envía el correo al alumno.
+  // Se llama tras aprobar el locker o el estacionamiento.
   aceptarSolicitud(
     idSolicitud: number,
     datos: AceptarSolicitudPayload
-  ): Observable<AceptarSolicitudResponse> {
-    return this.http.post<AceptarSolicitudResponse>(
-      `${this.API_URL}/solicitudes/${idSolicitud}/aceptar`,
-      datos
-    );
-  }
+  ): Observable<any> {
+    return this.http.post(`${this.API_URL}/solicitudes/${idSolicitud}/aceptar`, datos);
 
-  getUrlDescargaDocumento(qrToken: string): string {
-    return `${this.API_URL}/documentos/descargar/${qrToken}`;
   }
 }

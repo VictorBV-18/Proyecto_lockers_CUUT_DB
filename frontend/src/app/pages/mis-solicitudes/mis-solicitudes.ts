@@ -10,6 +10,19 @@ const NOMBRES_TIPO_DOCUMENTO: Record<number, string> = {
   4: 'Licencia de Conducir',
 };
 
+const DOCS_REQUERIDOS: Record<string, { id: number; nombre: string }[]> = {
+  locker: [
+    { id: 1, nombre: 'Credencial Escolar' },
+    { id: 2, nombre: 'Tira de Materias' },
+  ],
+  estacionamiento: [
+    { id: 1, nombre: 'Credencial Escolar' },
+    { id: 2, nombre: 'Tira de Materias' },
+    { id: 3, nombre: 'Tarjeta de Circulación' },
+    { id: 4, nombre: 'Licencia de Conducir' },
+  ],
+};
+
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 @Component({
@@ -121,6 +134,29 @@ export class MisSolicitudes {
 
   getClaseEstado(estado: string): string {
     return claseEstado(estado);
+  }
+
+  getDocsFaltantes(): { id: number; nombre: string }[] {
+    const sol = this.solicitudSeleccionada;
+    if (!sol || sol.estado_solicitud !== 'DATOS_INCOMPLETOS') return [];
+    const requeridos = DOCS_REQUERIDOS[sol.tipo_tramite.toLowerCase()] ?? [];
+    const subidos = new Set(sol.documentos_tramite.map(d => d.id_tipo_documento));
+    return requeridos.filter(d => !subidos.has(d.id));
+  }
+
+  reenviarSolicitud(): void {
+    if (!this.solicitudSeleccionada) return;
+    const idSolicitud = Number(this.solicitudSeleccionada.id_solicitud);
+    this.solicitudesUsuario.finalizarSolicitud(idSolicitud).subscribe({
+      next: () => {
+        this.solicitudesUsuario.peticionSuccess('Solicitud re-enviada correctamente.');
+        const idSol = this.solicitudSeleccionada!.id_solicitud;
+        this.detallesCache = null;
+        this.cargarDetalleModal(idSol, true);
+        this.getSolicitudes();
+      },
+      error: () => {},
+    });
   }
 
 }
