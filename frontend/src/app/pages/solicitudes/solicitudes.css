@@ -706,6 +706,97 @@
   color: var(--text-soft);
 }
 
+/* ── Sprint 5: Panel generación de documento ──────────────────── */
+.sap--doc,
+.sap--generated {
+  border-color: var(--primary-light, #d1e9dc);
+  background: #f4fbf7;
+}
+
+.sap-doc-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sap-label-hint {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.sap-input-meses {
+  width: 120px;
+  padding: 9px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  background: #fff;
+  transition: border-color 0.15s;
+}
+.sap-input-meses:focus { outline: none; border-color: var(--primary); }
+.sap-input-meses:disabled { opacity: 0.5; }
+
+.btn-generar-doc {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 22px;
+  border: none;
+  border-radius: 10px;
+  background: var(--primary);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.btn-generar-doc svg { width: 17px; height: 17px; }
+.btn-generar-doc:hover:not(:disabled) { background: var(--primary-dark); }
+.btn-generar-doc:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.sap-doc-info {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin: 4px 0 8px;
+}
+.sap-doc-info__item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sap-folio {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.5px;
+}
+
+.btn-descargar-pdf {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: 1.5px solid var(--primary);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--primary);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.btn-descargar-pdf svg { width: 17px; height: 17px; }
+.btn-descargar-pdf:hover { background: var(--primary); color: #fff; }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 720px) {
   .solicitudes { padding: 24px 18px 36px; }

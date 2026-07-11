@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { PersonalService } from '../../../core/service/personal-service';
 import { AdminService } from '../../../core/service/admin-service';
 import { Solicitud, SolicitudDetalleRevisor } from '../../../core/interfaces/personalinterfaces';
-import { LockerItem } from '../../../core/interfaces/admin-interfaces';
+import { AceptarSolicitudResponse, LockerItem } from '../../../core/interfaces/admin-interfaces';
 import { claseEstado, formatearFecha } from '../../../helpers/helpers';
 import Swal from 'sweetalert2';
 
@@ -71,6 +71,11 @@ export class Solicitudes {
   cargandoLockers    = signal(false);
   procesandoSolicitud = signal(false);
 
+  // Sprint 5: generación de documento
+  documentoGenerado   = signal<AceptarSolicitudResponse | null>(null);
+  procesandoAceptar   = signal(false);
+  mesesVigencia       = 4;
+
   // Propiedades normales solo para ngModel (actualizadas por el usuario, no async)
   motivoRechazo: Record<number, string> = {};
   lockerSeleccionado: number | null = null;
@@ -90,15 +95,24 @@ export class Solicitudes {
     return det.documentos.some(d => d.estado_documento === 'RECHAZADO');
   });
 
+  // Paso 3 del flujo Sprint 5: solicitud APROBADA pero sin documento generado aún
+  solicitudAprobadaSinDocumento = computed(() =>
+    this.solicitudDetalle()?.estado === 'APROBADA' && !this.documentoGenerado()
+  );
+
+  // Solicitud completamente cerrada (rechazo o documento ya emitido)
   solicitudFinalizada = computed(() => {
     const det = this.solicitudDetalle();
     if (!det) return true;
-    return ['APROBADA', 'DOCUMENTACION_INCORRECTA'].includes(det.estado);
+    return det.estado === 'DOCUMENTACION_INCORRECTA' || !!this.documentoGenerado();
   });
 
-  mostrarPanelAccion = computed(() =>
-    !this.solicitudFinalizada() && (this.todosAprobados() || this.hayRechazado())
-  );
+  // Panel de aprobación/rechazo solo cuando la solicitud está PENDIENTE con docs evaluados
+  mostrarPanelAccion = computed(() => {
+    const det = this.solicitudDetalle();
+    if (!det || det.estado === 'APROBADA') return false;
+    return !this.solicitudFinalizada() && (this.todosAprobados() || this.hayRechazado());
+  });
 
   // ── Init ──────────────────────────────────────────────────────
   ngOnInit() {
@@ -137,6 +151,8 @@ export class Solicitudes {
     this.rechazandoDoc.set({});
     this.procesandoDoc.set({});
     this.motivoRechazo = {};
+    this.documentoGenerado.set(null);
+    this.mesesVigencia = 4;
     this.resetAccionSolicitud();
   }
 
@@ -349,6 +365,47 @@ export class Solicitudes {
         d.id_documento === idDocumento ? { ...d, estado_documento: estado, comentario_admin: comentario } : d
       ),
     });
+  }
+
+  // ── Sprint 5: Paso 3 — Generar documento (constancia / tarjetón) ──
+
+  aceptarSolicitudFinal(): void {
+    const det = this.solicitudDetalle();
+    if (!det) return;
+
+    if (!this.mesesVigencia || this.mesesVigencia < 1 || this.mesesVigencia > 24) {
+      Swal.fire({ icon: 'warning', title: 'Ingresa un valor de vigencia válido (1-24 meses).', timer: 2000, showConfirmButton: false });
+      return;
+    }
+
+    this.procesandoAceptar.set(true);
+
+    this.adminService.aceptarSolicitud(det.id_solicitud, {
+      id_admin: this.idAdmin,
+      meses_vigencia: this.mesesVigencia,
+    }).subscribe({
+      next: (resp) => {
+        this.documentoGenerado.set(resp);
+        this.procesandoAceptar.set(false);
+        this.obtenerSolicitudes();
+        Swal.fire({
+          icon: 'success',
+          title: '¡Documento generado!',
+          text: `Folio: ${resp.folio} — Se envió el correo al alumno.`,
+          timer: 3000,
+          showConfirmButton: false,
+        });
+      },
+      error: (err) => {
+        this.procesandoAceptar.set(false);
+        Swal.fire({ icon: 'error', title: err?.error?.detail || 'Error al generar el documento', timer: 2500, showConfirmButton: false });
+      },
+    });
+  }
+
+  descargarPDF(qrToken: string): void {
+    const url = this.adminService.getUrlDescargaDocumento(qrToken);
+    window.open(url, '_blank');
   }
 
   // ── Helpers ───────────────────────────────────────────────────

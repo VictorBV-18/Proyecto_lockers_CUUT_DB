@@ -2,6 +2,28 @@
 .page-title   { font-size: 1.5rem; font-weight: 700; color: var(--primary-dark); margin: 0 0 0.25rem; }
 .page-desc    { color: var(--text-soft); font-size: 0.9rem; }
 
+/* ── Alert Banner ──────────────────────── */
+.alert-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  background: rgba(201, 162, 39, 0.12);
+  color: #7a5b00;
+  border: 1px solid rgba(201, 162, 39, 0.45);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 1.25rem;
+}
+
+.alert-banner__icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: #c9a227;
+}
+
 /* ── Summary Grid ──────────────────────── */
 .summary-grid {
   display: grid;

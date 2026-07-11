@@ -432,8 +432,85 @@
             </div>
           }
 
-          <!-- Solicitud ya finalizada -->
-          @if (solicitudFinalizada()) {
+          <!-- ── Paso 3 (Sprint 5): Generar constancia / tarjetón ── -->
+          @if (solicitudAprobadaSinDocumento()) {
+            <div class="sap sap--doc">
+              <div class="sap-estado sap-estado--ok">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3"/>
+                </svg>
+                Solicitud aprobada — genera el documento oficial para el alumno
+              </div>
+
+              <div class="sap-doc-form">
+                <label class="sap-label" for="mesesVigencia">
+                  Meses de vigencia
+                  <span class="sap-label-hint">(normalmente 4, un semestre completo)</span>
+                </label>
+                <input
+                  id="mesesVigencia"
+                  type="number"
+                  class="sap-input-meses"
+                  min="1"
+                  max="24"
+                  [(ngModel)]="mesesVigencia"
+                  [disabled]="procesandoAceptar()"
+                />
+              </div>
+
+              <div class="sap-form-actions">
+                <button
+                  class="btn-generar-doc"
+                  [disabled]="procesandoAceptar()"
+                  (click)="aceptarSolicitudFinal()"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                       stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <path d="M14 2v6h6M12 18v-6M9 15l3 3 3-3"/>
+                  </svg>
+                  {{ procesandoAceptar() ? 'Generando…' : 'Generar constancia / tarjetón' }}
+                </button>
+              </div>
+            </div>
+          }
+
+          <!-- ── Documento generado: folio + descarga ── -->
+          @if (documentoGenerado()) {
+            <div class="sap sap--generated">
+              <div class="sap-estado sap-estado--ok">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 6 9 17l-5-5"/>
+                </svg>
+                Documento generado y enviado al alumno por correo
+              </div>
+              <div class="sap-doc-info">
+                <div class="sap-doc-info__item">
+                  <span class="label-muted">Folio</span>
+                  <strong class="sap-folio">{{ documentoGenerado()!.folio }}</strong>
+                </div>
+                <div class="sap-doc-info__item">
+                  <span class="label-muted">Archivo</span>
+                  <span class="info-value">{{ documentoGenerado()!.archivo }}</span>
+                </div>
+              </div>
+              <button
+                class="btn-descargar-pdf"
+                (click)="descargarPDF(documentoGenerado()!.qr_token)"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                </svg>
+                Descargar PDF
+              </button>
+            </div>
+          }
+
+          <!-- Solicitud ya finalizada (rechazada) -->
+          @if (solicitudFinalizada() && !documentoGenerado()) {
             <div class="sap-finalizada">
               <span class="badge" [ngClass]="'badge--' + getClaseEstado(solicitudDetalle()!.estado)">
                 <i class="dot"></i>{{ solicitudDetalle()!.estado }}

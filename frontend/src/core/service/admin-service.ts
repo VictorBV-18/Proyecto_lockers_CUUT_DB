@@ -14,6 +14,8 @@ import {
   AprobarLockerPayload,
   AprobarEstacionamientoPayload,
   AceptarSolicitudPayload,
+  AceptarSolicitudResponse,
+
 } from '../interfaces/admin-interfaces';
 
 @Injectable({
@@ -96,7 +98,6 @@ export class AdminService {
       datos
     );
   }
-
   // Genera la constancia/tarjetón con QR y envía el correo al alumno.
   // Se llama tras aprobar el locker o el estacionamiento.
   aceptarSolicitud(
@@ -104,5 +105,6 @@ export class AdminService {
     datos: AceptarSolicitudPayload
   ): Observable<any> {
     return this.http.post(`${this.API_URL}/solicitudes/${idSolicitud}/aceptar`, datos);
+
   }
 }
