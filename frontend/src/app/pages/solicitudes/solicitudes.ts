@@ -80,7 +80,6 @@ export class Solicitudes {
   motivoRechazo: Record<number, string> = {};
   lockerSeleccionado: number | null = null;
   motivoRechazoSolicitud = '';
-  mesesVigencia = 4;
 
   // ── Computed (derivados de signals, como useMemo) ─────────────
   todosAprobados = computed(() => {
@@ -401,11 +400,6 @@ export class Solicitudes {
         Swal.fire({ icon: 'error', title: err?.error?.detail || 'Error al generar el documento', timer: 2500, showConfirmButton: false });
       },
     });
-  }
-
-  descargarPDF(qrToken: string): void {
-    const url = this.adminService.getUrlDescargaDocumento(qrToken);
-    window.open(url, '_blank');
   }
 
   // ── Helpers ───────────────────────────────────────────────────
