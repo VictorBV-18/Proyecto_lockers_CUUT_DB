@@ -1,15 +1,23 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from app.db.conexion import conectar_base
+from pathlib import Path
+import mimetypes
 import shutil
 import os
+
+
 
 router = APIRouter()
 
 # Carpeta donde se guardan los documentos
-CARPETA_UPLOADS = "uploads"
-if not os.path.exists(CARPETA_UPLOADS):
-    os.makedirs(CARPETA_UPLOADS)
+CARPETA_UPLOADS = Path(__file__).resolve().parents[2] / "uploads"
+
+if not CARPETA_UPLOADS.exists():
+    CARPETA_UPLOADS.mkdir(parents=True, exist_ok=True)
+
+
 
 class SolicitudCrear(BaseModel):
     numero_cuenta: str
@@ -131,7 +139,7 @@ async def subir_documento(
         nombre_documento_legible = tipo_doc_bd[0]
         nombre_tipo_limpio = nombre_documento_legible.replace(" ", "_")
         nombre_seguro = f"{nombre_tipo_limpio}_solicitud_{id_solicitud}_{archivo.filename}"
-        ruta_guardado = os.path.join(CARPETA_UPLOADS, nombre_seguro)
+        ruta_guardado = CARPETA_UPLOADS / nombre_seguro
 
         with open(ruta_guardado, "wb") as buffer:
             shutil.copyfileobj(archivo.file, buffer)
@@ -322,21 +330,46 @@ def resumen_solicitud(numero_cuenta: str):
 
 
 # Endpoint - Consultar historial de solicitudes con TODOS los documentos anidados
-@router.get("/solicitudes/{numero_cuenta}", tags=["Alumno"], summary="Obtener el historial de las solicitudes del alumno de forma detallada")
-def consultar_solicitudes_por_alumno(numero_cuenta: str):
+@router.get(
+    "/solicitudes/{numero_cuenta}",
+    tags=["Alumno"],
+    summary="Obtener el historial de las solicitudes del alumno de forma detallada"
+)
+def consultar_solicitudes_por_alumno(
+    numero_cuenta: str,
+    request: Request
+):
+    base_url = str(request.base_url).rstrip("/")
+
     conexion = conectar_base()
     if conexion is None:
-        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+        raise HTTPException(
+            status_code=500,
+            detail="Error de conexión a la BD"
+        )
 
     try:
         cursor = conexion.cursor()
-        cursor.execute("SELECT id_alumno FROM alumno WHERE numero_cuenta = %s", (numero_cuenta,))
+
+        cursor.execute(
+            """
+            SELECT id_alumno
+            FROM alumno
+            WHERE numero_cuenta = %s
+            """,
+            (numero_cuenta,)
+        )
+
         alumno = cursor.fetchone()
 
         if not alumno:
             cursor.close()
             conexion.close()
-            raise HTTPException(status_code=404, detail="Alumno no encontrado")
+
+            raise HTTPException(
+                status_code=404,
+                detail="Alumno no encontrado"
+            )
 
         id_alumno = alumno[0]
 
@@ -347,15 +380,35 @@ def consultar_solicitudes_por_alumno(numero_cuenta: str):
                 s.tipo_tramite,
                 s.estado AS estado_solicitud,
                 s.observacion_alumno,
+
                 ds.id_tipo_documento,
                 ds.archivo_path,
                 ds.comentario,
                 ds.estado AS estado_documento,
-                ds.id_documento
+                ds.id_documento,
+
+                c.qr_token,
+                c.folio AS folio_documento,
+                c.vigencia,
+                c.estado AS estado_constancia,
+                c.documento_path
+
             FROM solicitud s
-            LEFT JOIN documentos_solicitud ds ON s.id_solicitud = ds.id_solicitud
+
+            LEFT JOIN documentos_solicitud ds
+                ON s.id_solicitud = ds.id_solicitud
+
+            LEFT JOIN asignacion a
+                ON s.id_solicitud = a.id_solicitud
+
+            LEFT JOIN constancia c
+                ON a.id_asignacion = c.id_asignacion
+
             WHERE s.id_alumno = %s
-            ORDER BY s.id_solicitud, ds.id_tipo_documento
+
+            ORDER BY
+                s.id_solicitud,
+                ds.id_tipo_documento
             """,
             (id_alumno,)
         )
@@ -364,25 +417,47 @@ def consultar_solicitudes_por_alumno(numero_cuenta: str):
         solicitudes_dict = {}
 
         for fila in filas:
-            id_sol = fila[0]
-            if id_sol not in solicitudes_dict:
-                solicitudes_dict[id_sol] = {
-                    "id_solicitud": fila[0],
-                    "folio": f"FOL-{fila[0]:04d}",
+            id_solicitud = fila[0]
+
+            if id_solicitud not in solicitudes_dict:
+                qr_token = str(fila[9]) if fila[9] else ""
+
+                solicitudes_dict[id_solicitud] = {
+                    "id_solicitud": id_solicitud,
+                    "folio": f"FOL-{id_solicitud:04d}",
                     "tipo_tramite": fila[1],
                     "estado_solicitud": fila[2],
+                    "qr_token": qr_token,
+                    "documento_emitido": {
+                        "folio": fila[10] or "",
+                        "vigencia": fila[11],
+                        "estado": fila[12] or "",
+                        "documento_path": fila[13] or "",
+                        "url_descarga": (
+                            f"{base_url}/documentos/descargar/{qr_token}"
+                            if qr_token
+                            else ""
+                        )
+                    },
                     "documentos_tramite": []
                 }
+
             if fila[8] is not None:
-                solicitudes_dict[id_sol]["documentos_tramite"].append({
+                id_documento = fila[8]
+
+                solicitudes_dict[id_solicitud]["documentos_tramite"].append({
                     "id_tipo_documento": fila[4],
                     "archivo": fila[5],
                     "comentario_admin": fila[6],
                     "estado_documento": fila[7],
-                    "id_documento": fila[8]
+                    "id_documento": id_documento,
+                    "documento_url": (
+                        f"{base_url}/documentos/solicitud/{id_documento}"
+                    )
                 })
 
         solicitudes = list(solicitudes_dict.values())
+
         cursor.close()
         conexion.close()
 
@@ -391,7 +466,86 @@ def consultar_solicitudes_por_alumno(numero_cuenta: str):
             "solicitudes": solicitudes
         }
 
+    except HTTPException:
+        raise
+
     except Exception as e:
         if conexion:
             conexion.close()
-        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error en BD: {str(e)}"
+        )
+
+# Endpoint - Visualizar documento subido por el alumno
+@router.get(
+    "/documentos/solicitud/{id_documento}",
+    tags=["Alumno", "Administrador / Personal"],
+    summary="Visualizar documento subido por el alumno"
+)
+def visualizar_documento_solicitud(id_documento: int):
+    conexion = conectar_base()
+
+    if conexion is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Error de conexión a la BD"
+        )
+
+    try:
+        cursor = conexion.cursor()
+
+        cursor.execute("""
+            SELECT archivo_path
+            FROM documentos_solicitud
+            WHERE id_documento = %s
+        """, (id_documento,))
+
+        resultado = cursor.fetchone()
+
+        cursor.close()
+        conexion.close()
+
+        if not resultado:
+            raise HTTPException(
+                status_code=404,
+                detail="Documento no encontrado."
+            )
+
+        nombre_archivo = resultado[0]
+
+        if not nombre_archivo:
+            raise HTTPException(
+                status_code=404,
+                detail="El documento no tiene archivo registrado."
+            )
+
+        ruta_archivo = CARPETA_UPLOADS / Path(nombre_archivo).name
+
+        if not ruta_archivo.exists() or not ruta_archivo.is_file():
+            raise HTTPException(
+                status_code=404,
+                detail="El archivo físico no existe en el servidor."
+            )
+
+        tipo_mime, _ = mimetypes.guess_type(str(ruta_archivo))
+
+        return FileResponse(
+            path=str(ruta_archivo),
+            media_type=tipo_mime or "application/octet-stream",
+            filename=ruta_archivo.name,
+            content_disposition_type="inline"
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        if conexion:
+            conexion.close()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al abrir el documento: {str(e)}"
+        )

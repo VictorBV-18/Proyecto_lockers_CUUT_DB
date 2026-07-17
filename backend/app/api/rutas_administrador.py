@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from app.db.conexion import conectar_base
 from app.utils.notificaciones import enviar_correo_rechazo, enviar_correo_documento
@@ -39,11 +39,23 @@ class AprobarLocker(BaseModel):
 
 
 
-@router.get("/solicitudes/{id_solicitud}/detalle", tags=["Administrador / Personal"], summary="Obtener documentos de una solicitud para revisión")
-def obtener_detalle_solicitud(id_solicitud: int):
+@router.get(
+    "/solicitudes/{id_solicitud}/detalle",
+    tags=["Administrador / Personal"],
+    summary="Obtener documentos de una solicitud para revisión"
+)
+def obtener_detalle_solicitud(
+    id_solicitud: int,
+    request: Request
+):
+    base_url = str(request.base_url).rstrip("/")
+
     conexion = conectar_base()
     if conexion is None:
-        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+        raise HTTPException(
+            status_code=500,
+            detail="Error de conexión a la BD"
+        )
 
     try:
         cursor = conexion.cursor()
@@ -63,21 +75,29 @@ def obtener_detalle_solicitud(id_solicitud: int):
                 ds.estado AS estado_documento,
                 ds.comentario
             FROM solicitud s
-            JOIN alumno a ON s.id_alumno = a.id_alumno
-            LEFT JOIN documentos_solicitud ds ON s.id_solicitud = ds.id_solicitud
-            LEFT JOIN tipo_documento td ON ds.id_tipo_documento = td.id_tipo_documento
+            JOIN alumno a
+                ON s.id_alumno = a.id_alumno
+            LEFT JOIN documentos_solicitud ds
+                ON s.id_solicitud = ds.id_solicitud
+            LEFT JOIN tipo_documento td
+                ON ds.id_tipo_documento = td.id_tipo_documento
             WHERE s.id_solicitud = %s
             ORDER BY ds.id_tipo_documento
         """, (id_solicitud,))
 
         filas = cursor.fetchall()
+
         cursor.close()
         conexion.close()
 
         if not filas:
-            raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+            raise HTTPException(
+                status_code=404,
+                detail="Solicitud no encontrada."
+            )
 
         primera = filas[0]
+
         detalle = {
             "id_solicitud": primera[0],
             "tipo_tramite": primera[1],
@@ -90,23 +110,33 @@ def obtener_detalle_solicitud(id_solicitud: int):
 
         for fila in filas:
             if fila[6] is not None:
+                id_documento = fila[6]
+
                 detalle["documentos"].append({
-                    "id_documento": fila[6],
+                    "id_documento": id_documento,
                     "id_tipo_documento": fila[7],
                     "nombre_tipo_documento": fila[8],
                     "archivo": fila[9],
                     "estado_documento": fila[10],
-                    "comentario_admin": fila[11]
+                    "comentario_admin": fila[11],
+                    "documento_url": (
+                        f"{base_url}/documentos/solicitud/{id_documento}"
+                    )
                 })
 
         return detalle
 
     except HTTPException:
         raise
+
     except Exception as e:
         if conexion:
             conexion.close()
-        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error en BD: {str(e)}"
+        )
 
 
 @router.get("/solicitudes/", tags=["Administrador / Personal"], summary="Obtener todas las solicitudes de los alumnos (Tabla principal)")
