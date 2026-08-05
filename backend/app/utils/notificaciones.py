@@ -5,7 +5,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 
-# Configuracion SMTP por medio de GMAIL (PRUEBA)
+
 CORREO_REMITENTE = "tramitesprueba375@gmail.com" 
 CONTRASENA_APP = "uhbcsasrhxcoduvj"   
 

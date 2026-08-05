@@ -5,6 +5,10 @@ from app.db.conexion import conectar_base
 
 router = APIRouter()
 
+class LiberacionMasiva(BaseModel):
+    id_admin: int
+    motivo: str = "Fin de ciclo escolar"
+
 class EstadoLocker(str, Enum):
     DISPONIBLE = "DISPONIBLE"
     OCUPADO = "OCUPADO"
@@ -25,10 +29,6 @@ class BajaLocker(BaseModel):
     motivo: str
 
 
-
-############################################
-## endpoint DISPONIBILIDAD DE LOCKERS
-############################################
 @router.get("/inventario/lockers", tags=["Inventario"], summary="Consultar inventario general de lockers")
 def consultar_inventario_lockers():
     conexion = conectar_base()
@@ -95,9 +95,7 @@ def consultar_inventario_lockers():
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
     
 
-############################################
-## endpoint administrador de lockers.
-############################################
+
 @router.get("/admin/lockers", tags=["Inventario"], summary="Listar todos los lockers para administrador")
 def listar_todos_los_lockers():
     conexion = conectar_base()
@@ -132,9 +130,7 @@ def listar_todos_los_lockers():
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
     
 
-############################################
-## endpoint creación de lockers nuevos.
-############################################
+
 @router.post("/admin/lockers", tags=["Inventario"], summary="Crear un nuevo locker")
 def crear_locker(datos: CrearLocker):
     conexion = conectar_base()
@@ -178,9 +174,7 @@ def crear_locker(datos: CrearLocker):
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
 
-############################################
-## endpoint Actualizar estado lockers 
-############################################
+
 @router.put("/admin/lockers/{id_locker}", tags=["Inventario"], summary="Actualizar información de un locker")
 def actualizar_locker(id_locker: int, datos: ActualizarLocker):
     conexion = conectar_base()
@@ -231,9 +225,7 @@ def actualizar_locker(id_locker: int, datos: ActualizarLocker):
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
 
-############################################
-## endpoint dar de baja un locker
-############################################
+
 @router.patch("/admin/lockers/{id_locker}/baja", tags=["Inventario"], summary="Dar de baja lógica un locker")
 def dar_baja_locker(id_locker: int, datos: BajaLocker):
     if not datos.motivo or datos.motivo.strip() == "":
@@ -277,6 +269,59 @@ def dar_baja_locker(id_locker: int, datos: BajaLocker):
 
     except HTTPException:
         raise
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+    
+
+
+@router.post("/admin/inventario/liberacion-masiva", tags=["Inventario"], summary="Liberar todos los lockers y caducar constancias")
+def liberar_lockers_masivamente(datos: LiberacionMasiva):
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+        
+        cursor.execute("""
+            UPDATE constancia c
+            SET estado = 'VENCIDO'
+            FROM asignacion a
+            JOIN solicitud s ON a.id_solicitud = s.id_solicitud
+            WHERE c.id_asignacion = a.id_asignacion 
+              AND a.estado = 'ACTIVA' 
+              AND s.tipo_tramite = 'locker';
+        """)
+        
+        cursor.execute("""
+            UPDATE asignacion a
+            SET estado = 'FINALIZADA'
+            FROM solicitud s
+            WHERE a.id_solicitud = s.id_solicitud 
+              AND a.estado = 'ACTIVA' 
+              AND s.tipo_tramite = 'locker';
+        """)
+        
+        cursor.execute("""
+            UPDATE locker 
+            SET estado = 'DISPONIBLE' 
+            WHERE estado = 'OCUPADO';
+        """)
+        lockers_liberados = cursor.rowcount
+        
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+        
+        return {
+            "mensaje": "Liberación masiva ejecutada con éxito.",
+            "lockers_liberados": lockers_liberados,
+            "motivo": datos.motivo
+        }
+
     except Exception as e:
         if conexion:
             conexion.rollback()

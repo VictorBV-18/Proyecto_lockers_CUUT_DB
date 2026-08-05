@@ -7,8 +7,24 @@ from datetime import datetime, timedelta
 import os
 from fastapi.responses import FileResponse
 from app.utils.generador_pdf import generar_documento
+from app.schemas.usuarios import AlumnoCrear, PersonalCrear
+from app.utils.seguridad import obtener_hash_contrasena
+import math
+import io
+import pandas as pd
+from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse
+
 
 router = APIRouter()
+
+class CambioEstadoUsuario(BaseModel):
+    numero_cuenta: str
+    estado_activo: bool
+
+class CambioRol(BaseModel):
+    numero_cuenta: str
+    nuevo_rol: str
 
 class OpcionesEstadoDocumento(str, Enum):
     APROBADO = "APROBADO"
@@ -39,7 +55,7 @@ class AprobarLocker(BaseModel):
 
 
 
-@router.get("/solicitudes/{id_solicitud}/detalle", tags=["Administrador / Personal"], summary="Obtener documentos de una solicitud para revisión")
+@router.get("/solicitudes/{id_solicitud}/detalle", tags=["Administrador / Personal"], summary="Obtener documentos de una solicitud completa para revisión")
 def obtener_detalle_solicitud(id_solicitud: int):
     conexion = conectar_base()
     if conexion is None:
@@ -109,12 +125,16 @@ def obtener_detalle_solicitud(id_solicitud: int):
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
 
-@router.get("/solicitudes/", tags=["Administrador / Personal"], summary="Obtener todas las solicitudes de los alumnos (Tabla principal)")
+@router.get("/solicitudes/", tags=["Administrador / Personal"], summary="Obtener todas las solicitudes de los alumnos (Tabla principal / Separada mediante bloques de datos de 20 en 20)")
 def obtener_todas_las_solicitudes(
     tipo_tramite: str | None = None, 
     estado: str | None = None, 
-    fecha: str | None = None
+    fecha: str | None = None,
+    page: int = 1
 ):
+    registros_por_pagina = 20
+    offset = (page - 1) * registros_por_pagina
+
     conexion = conectar_base()
     if conexion is None:
         raise HTTPException(status_code=500, detail="Error de conexión a la BD")
@@ -122,7 +142,30 @@ def obtener_todas_las_solicitudes(
     try:
         cursor = conexion.cursor()
         
-        query = """
+        query_base = """
+            FROM solicitud s
+            JOIN alumno a ON s.id_alumno = a.id_alumno
+            WHERE s.estado != 'DATOS_INCOMPLETOS'
+        """
+        parametros = []
+
+        if tipo_tramite:
+            query_base += " AND s.tipo_tramite = %s"
+            parametros.append(tipo_tramite.lower())
+            
+        if estado:
+            query_base += " AND s.estado = %s"
+            parametros.append(estado.upper())
+            
+        if fecha:
+            query_base += " AND DATE(s.fecha_solicitud) = %s"
+            parametros.append(fecha)
+
+        query_count = f"SELECT COUNT(*) {query_base}"
+        cursor.execute(query_count, tuple(parametros))
+        total_registros = cursor.fetchone()[0]
+
+        query_paginada = f"""
             SELECT 
                 s.id_solicitud,
                 a.numero_cuenta,
@@ -131,31 +174,16 @@ def obtener_todas_las_solicitudes(
                 s.tipo_tramite,
                 s.fecha_solicitud,
                 s.estado
-            FROM solicitud s
-            JOIN alumno a ON s.id_alumno = a.id_alumno
-            WHERE s.estado != 'DATOS_INCOMPLETOS'
+            {query_base}
+            ORDER BY s.fecha_solicitud DESC
+            LIMIT %s OFFSET %s
         """
-        parametros = []
-
-        if tipo_tramite:
-            query += " AND s.tipo_tramite = %s"
-            parametros.append(tipo_tramite.lower())
-            
-        if estado:
-            query += " AND s.estado = %s"
-            parametros.append(estado.upper())
-            
-        if fecha:
-            query += " AND DATE(s.fecha_solicitud) = %s"
-            parametros.append(fecha)
-
-        query += " ORDER BY s.fecha_solicitud DESC"
-
-        cursor.execute(query, tuple(parametros))
+        parametros.extend([registros_por_pagina, offset])
         
+        cursor.execute(query_paginada, tuple(parametros))
         filas = cursor.fetchall()
+        
         solicitudes = []
-
         for fila in filas:
             solicitudes.append({
                 "id_solicitud": fila[0],
@@ -169,7 +197,16 @@ def obtener_todas_las_solicitudes(
 
         cursor.close()
         conexion.close()
-        return {"solicitudes": solicitudes}
+
+        total_paginas = math.ceil(total_registros / registros_por_pagina) if total_registros > 0 else 1
+
+        return {
+            "pagina_actual": page,
+            "registros_por_pagina": registros_por_pagina,
+            "total_registros": total_registros,
+            "total_paginas": total_paginas,
+            "resultados": solicitudes
+        }
 
     except Exception as e:
         if conexion:
@@ -177,7 +214,7 @@ def obtener_todas_las_solicitudes(
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
 
-@router.put("/solicitudes/{id_solicitud}/documentos/{id_documento}", tags=["Administrador / Personal"], summary="Evaluar documento individual")
+@router.put("/solicitudes/{id_solicitud}/documentos/{id_documento}", tags=["Administrador / Personal"], summary="Evaluar documento individualmente de cada solicitud")
 def evaluar_documento_individual(
     id_solicitud: int,
     id_documento: int,
@@ -242,7 +279,7 @@ def evaluar_documento_individual(
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
 
-@router.post("/solicitudes/{id_solicitud}/rechazar", tags=["Administrador / Personal"], summary="Rechazar solicitud completa y notificar via correo electronico")
+@router.post("/solicitudes/{id_solicitud}/rechazar", tags=["Administrador / Personal"], summary="Rechazar solicitud completa y notificar via correo electronico el motivo")
 def rechazar_solicitud(id_solicitud: int, datos: RechazarSolicitud):
     if not datos.motivo or datos.motivo.strip() == "":
         raise HTTPException(status_code=400, detail="El motivo de rechazo es obligatorio.")
@@ -330,8 +367,7 @@ def rechazar_solicitud(id_solicitud: int, datos: RechazarSolicitud):
 
 
 
-# endpoint aprobar lockers
-@router.post("/solicitudes/{id_solicitud}/aprobar-locker", tags=["Administrador / Personal"], summary="Aprobar solicitud de locker y asignar")
+@router.post("/solicitudes/{id_solicitud}/aprobar-locker", tags=["Administrador / Personal"], summary="Aprobar solicitud de locker y asignarle uno al alumno")
 def aprobar_solicitud_locker(id_solicitud: int, datos: AprobarLocker):
     conexion = conectar_base()
     if conexion is None:
@@ -420,7 +456,6 @@ def aprobar_solicitud_locker(id_solicitud: int, datos: AprobarLocker):
 
 
 
-# endpoint aprobar estacionamiento
 @router.post("/solicitudes/{id_solicitud}/aprobar-estacionamiento", tags=["Administrador / Personal"], summary="Aprobar solicitud de estacionamiento")
 def aprobar_solicitud_estacionamiento(id_solicitud: int, datos: AprobarEstacionamiento):
     conexion = conectar_base()
@@ -462,7 +497,6 @@ def aprobar_solicitud_estacionamiento(id_solicitud: int, datos: AprobarEstaciona
 
         cursor.execute("UPDATE solicitud SET estado = 'APROBADA', revisado_por = %s, fecha_revision = CURRENT_TIMESTAMP WHERE id_solicitud = %s;", (datos.id_admin, id_solicitud))
         
-        # Crear asignación sin locker (NULL)
         cursor.execute("INSERT INTO asignacion (id_solicitud, id_locker, estado) VALUES (%s, NULL, 'ACTIVA') RETURNING id_asignacion;", (id_solicitud,))
         id_asignacion = cursor.fetchone()[0]
         
@@ -556,10 +590,11 @@ def aceptar_solicitud_y_generar_documento(id_solicitud: int, datos: GenerarDocum
             codigo_locker=cod_locker,
             ubicacion_locker=ubi_locker
         )
-        
+    
         cursor.execute("""
             UPDATE constancia SET documento_path = %s WHERE id_asignacion = %s;
         """, (nombre_archivo_pdf, id_asignacion))
+
 
         cursor.execute("""
             INSERT INTO historial_estados (id_solicitud, estado_anterior, estado_nuevo, id_admin, comentario)
@@ -592,7 +627,7 @@ def aceptar_solicitud_y_generar_documento(id_solicitud: int, datos: GenerarDocum
         raise HTTPException(status_code=500, detail=f"Error en BD/Motor: {str(e)}")
 
 
-@router.get("/documentos/descargar/{qr_token}", tags=["Administrador / Personal", "Alumno"], summary="Descargar el PDF de un trámite")
+@router.get("/documentos/descargar/{qr_token}", tags=["Administrador / Personal", "Alumno"], summary="Descargar el PDF de un trámite mediante el qr_token")
 def descargar_documento(qr_token: str):
     conexion = conectar_base()
     if conexion is None:
@@ -628,6 +663,372 @@ def descargar_documento(qr_token: str):
         raise
     except ValueError:
          raise HTTPException(status_code=400, detail="Formato de token inválido.")
+    except Exception as e:
+        if conexion:
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
+    
+
+
+@router.post("/admin/usuarios/alumno", tags=["Administrador / Personal"], summary="Crear cuenta de Alumno")
+def crear_cuenta_alumno(datos: AlumnoCrear):
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    hash_password = obtener_hash_contrasena(datos.contrasena)
+
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("""
+            INSERT INTO alumno (numero_cuenta, nombre, apellidos, carrera, correo_electronico, contrasena_hash, estado_activo)
+            VALUES (%s, %s, %s, %s, %s, %s, TRUE)
+            RETURNING id_alumno;
+        """, (datos.numero_cuenta, datos.nombre, datos.apellidos, datos.carrera, datos.correo_electronico, hash_password))
+        
+        id_nuevo = cursor.fetchone()[0]
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+
+        return {"mensaje": "Cuenta de alumno creada exitosamente.", "id_alumno": id_nuevo}
+
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+            conexion.close()
+            
+        if "unique constraint" in str(e).lower():
+            raise HTTPException(status_code=400, detail="El número de cuenta ya está registrado.")
+            
+        raise HTTPException(status_code=500, detail=f"Error en BD/Servidor: {str(e)}")
+
+
+@router.post("/admin/usuarios/personal", tags=["Administrador / Personal"], summary="Crear una cuenta de un personal o guardia, en caso de guardia el correo electronico puede ser nulo")
+def crear_cuenta_personal(datos: PersonalCrear):
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    hash_password = obtener_hash_contrasena(datos.contrasena)
+
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("""
+            INSERT INTO admin (numero_cuenta, nombre, apellidos, correo_electronico, contrasena_hash, rol, estado_activo)
+            VALUES (%s, %s, %s, %s, %s, %s, TRUE)
+            RETURNING id_admin;
+        """, (datos.numero_cuenta, datos.nombre, datos.apellidos, datos.correo_electronico, hash_password, datos.rol.upper()))
+        
+        id_nuevo = cursor.fetchone()[0]
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+
+        return {"mensaje": f"Cuenta de personal ({datos.rol}) creada exitosamente.", "id_admin": id_nuevo}
+
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+            conexion.close()
+        if "unique constraint" in str(e).lower():
+            raise HTTPException(status_code=400, detail="El número de cuenta ya está registrado.")
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+    
+
+@router.get("/admin/estadisticas/dashboard", tags=["Administrador / Personal"], summary="Obtener estadísticas para el dashboard")
+def obtener_estadisticas_dashboard():
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+    try:
+        cursor = conexion.cursor()
+        
+        cursor.execute("""
+            SELECT 
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE estado IN ('PENDIENTE', 'EN_REVISION')) as pendientes,
+                COUNT(*) FILTER (WHERE estado = 'APROBADA') as aprobadas,
+                COUNT(*) FILTER (WHERE estado = 'DOCUMENTACION_INCORRECTA') as rechazadas
+            FROM solicitud;
+        """)
+        sol_stats = cursor.fetchone()
+        
+        cursor.execute("""
+            SELECT 
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE estado = 'DISPONIBLE') as disponibles,
+                COUNT(*) FILTER (WHERE estado = 'OCUPADO') as ocupados,
+                COUNT(*) FILTER (WHERE estado = 'MANTENIMIENTO') as mantenimiento
+            FROM locker;
+        """)
+        lock_stats = cursor.fetchone()
+        
+        cursor.close()
+        conexion.close()
+        
+        return {
+            "solicitudes": {
+                "total": sol_stats[0],
+                "pendientes": sol_stats[1],
+                "aprobadas": sol_stats[2],
+                "rechazadas": sol_stats[3]
+            },
+            "lockers": {
+                "total": lock_stats[0],
+                "disponibles": lock_stats[1],
+                "ocupados": lock_stats[2],
+                "mantenimiento": lock_stats[3]
+            }
+        }
+    except Exception as e:
+        if conexion:
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+
+@router.get("/admin/estadisticas/excel", tags=["Administrador / Personal"], summary="Exportar estadísticas a excel")
+def exportar_estadisticas_excel():
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+        
+    try:
+        query = """
+            SELECT 
+                'FOL-' || LPAD(s.id_solicitud::text, 4, '0') as Folio, 
+                a.numero_cuenta as Cuenta, 
+                a.nombre || ' ' || a.apellidos as Alumno, 
+                s.tipo_tramite as Tramite, 
+                s.estado as Estado, 
+                TO_CHAR(s.fecha_solicitud, 'YYYY-MM-DD HH24:MI') as Fecha
+            FROM solicitud s
+            JOIN alumno a ON s.id_alumno = a.id_alumno
+            ORDER BY s.fecha_solicitud DESC
+        """
+        df_solicitudes = pd.read_sql(query, conexion)
+        conexion.close()
+        
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df_solicitudes.to_excel(writer, sheet_name='Reporte de Solicitudes', index=False)
+            
+        output.seek(0)
+        
+        headers = {
+            'Content-Disposition': 'attachment; filename="Estadisticas_CUUT.xlsx"'
+        }
+        return StreamingResponse(output, headers=headers, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+    except Exception as e:
+        if conexion:
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error al generar Excel: {str(e)}")
+
+
+
+@router.get("/admin/usuarios", tags=["Administrador / Personal"], summary="Obtener lista de usuarios dentro del sistema separados con filtros y mediante bloques de datos de 20 en 20")
+def listar_usuarios(
+    rol: str | None = None, 
+    estado_activo: bool | None = None, 
+    busqueda: str | None = None, 
+    page: int = 1
+):
+    registros_por_pagina = 20
+    offset = (page - 1) * registros_por_pagina
+
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+        
+        
+        query_base = """
+            WITH UsuariosCompletos AS (
+                SELECT id_alumno as id, numero_cuenta, nombre, apellidos, correo_electronico, estado_activo, 'ALUMNO' as rol 
+                FROM alumno
+                UNION ALL
+                SELECT id_admin as id, numero_cuenta, nombre, apellidos, correo_electronico, estado_activo, rol 
+                FROM admin
+            )
+            SELECT id, numero_cuenta, nombre, apellidos, correo_electronico, estado_activo, rol
+            FROM UsuariosCompletos
+            WHERE 1=1
+        """
+        filtros = []
+
+        if rol:
+            query_base += " AND rol = %s"
+            filtros.append(rol.upper())
+            
+        if estado_activo is not None:
+            query_base += " AND estado_activo = %s"
+            filtros.append(estado_activo)
+            
+        if busqueda:
+            query_base += " AND (numero_cuenta ILIKE %s OR nombre ILIKE %s OR apellidos ILIKE %s)"
+            busqueda_like = f"%{busqueda}%"
+            filtros.extend([busqueda_like, busqueda_like, busqueda_like])
+
+        query_count = f"SELECT COUNT(*) FROM ({query_base}) AS conteo"
+        cursor.execute(query_count, tuple(filtros))
+        total_registros = cursor.fetchone()[0]
+
+        query_paginada = query_base + " ORDER BY rol, apellidos LIMIT %s OFFSET %s"
+        filtros.extend([registros_por_pagina, offset])
+        
+        cursor.execute(query_paginada, tuple(filtros))
+        filas = cursor.fetchall()
+        
+        resultados = []
+        for fila in filas:
+            resultados.append({
+                "id_usuario": fila[0],
+                "numero_cuenta": fila[1],
+                "nombre_completo": f"{fila[2]} {fila[3]}",
+                "correo_electronico": fila[4],
+                "estado_activo": fila[5],
+                "rol": fila[6]
+            })
+
+        cursor.close()
+        conexion.close()
+
+        total_paginas = math.ceil(total_registros / registros_por_pagina) if total_registros > 0 else 1
+
+        return {
+            "pagina_actual": page,
+            "registros_por_pagina": registros_por_pagina,
+            "total_registros": total_registros,
+            "total_paginas": total_paginas,
+            "resultados": resultados
+        }
+
+    except Exception as e:
+        if conexion:
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+    
+
+@router.put("/admin/usuarios/estado", tags=["Administrador / Personal"], summary="Activar, desactivar o bloquear una cuenta")
+def cambiar_estado_usuario(datos: CambioEstadoUsuario):
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+        
+        cursor.execute("""
+            UPDATE alumno SET estado_activo = %s WHERE numero_cuenta = %s RETURNING id_alumno;
+        """, (datos.estado_activo, datos.numero_cuenta))
+        resultado_alumno = cursor.fetchone()
+
+        if resultado_alumno:
+            conexion.commit()
+            cursor.close()
+            conexion.close()
+            return {"mensaje": f"Estado del alumno actualizado a: {'Activo' if datos.estado_activo else 'Inactivo'}"}
+
+        cursor.execute("""
+            UPDATE admin SET estado_activo = %s WHERE numero_cuenta = %s RETURNING id_admin;
+        """, (datos.estado_activo, datos.numero_cuenta))
+        resultado_personal = cursor.fetchone()
+
+        if resultado_personal:
+            conexion.commit()
+            cursor.close()
+            conexion.close()
+            return {"mensaje": f"Estado del personal actualizado a: {'Activo' if datos.estado_activo else 'Inactivo'}"}
+
+        cursor.close()
+        conexion.close()
+        raise HTTPException(status_code=404, detail="El número de cuenta no existe en el sistema.")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+    
+
+@router.put("/admin/usuarios/rol", tags=["Administrador / Personal"], summary="Cambiar el rol de cualquier usuario")
+def cambiar_rol_personal(datos: CambioRol):
+    rol_upper = datos.nuevo_rol.upper()
+    if rol_upper not in ["ADMIN", "REVISOR", "VIGILANTE"]:
+        raise HTTPException(status_code=400, detail="Rol inválido. Debe ser ADMIN, REVISOR o VIGILANTE.")
+
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+        
+        cursor.execute("""
+            UPDATE admin SET rol = %s WHERE numero_cuenta = %s RETURNING id_admin;
+        """, (rol_upper, datos.numero_cuenta))
+        
+        resultado = cursor.fetchone()
+
+        if not resultado:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=404, detail="El usuario no existe o es un alumno (los alumnos no pueden cambiar de rol).")
+
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+        return {"mensaje": f"Rol actualizado exitosamente a {rol_upper}."}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+    
+
+@router.get("/solicitudes/documentos/{id_documento}/visualizar", tags=["Administrador / Personal", "Alumno"], summary="Previsualizar un documento y el nombre de forma segura sin exponer datos del alumno publicamente")
+def ver_documento_subido(id_documento: int):
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+        
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("SELECT archivo_path FROM documentos_solicitud WHERE id_documento = %s", (id_documento,))
+        resultado = cursor.fetchone()
+        
+        cursor.close()
+        conexion.close()
+        
+        if not resultado:
+            raise HTTPException(status_code=404, detail="Documento no encontrado en la base de datos.")
+            
+        archivo_path = resultado[0]
+        ruta_completa = os.path.join("uploads", archivo_path)
+        
+        if not os.path.exists(ruta_completa):
+            raise HTTPException(status_code=404, detail="El archivo físico ya no existe en el servidor.")
+            
+        extension = archivo_path.lower().split('.')[-1]
+        media_type = "application/pdf" if extension == "pdf" else f"image/{extension}"
+            
+        return FileResponse(
+            path=ruta_completa, 
+            media_type=media_type, 
+            filename=archivo_path,
+            content_disposition_type="inline" 
+        )
+
+    except HTTPException:
+        raise
     except Exception as e:
         if conexion:
             conexion.close()
