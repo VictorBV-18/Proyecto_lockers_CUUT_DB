@@ -283,6 +283,8 @@
 .icon-btn svg { width: 20px; height: 20px; display: block; }
 .icon-btn + .icon-btn { margin-left: 6px; }
 .icon-btn:hover { color: var(--primary); background: #eef3f0; }
+.icon-btn--download { color: var(--success); }
+.icon-btn--download:hover { color: var(--success); background: var(--success-bg); }
 
 /* ---------- Footer del panel ---------- */
 .panel__footer {
@@ -613,6 +615,64 @@
 .btn-resubir input[type="file"] { display: none; }
 .btn-resubir:hover { background: var(--primary-darker); }
 .btn-resubir--loading { opacity: 0.65; cursor: not-allowed; }
+
+/* Doc item faltante (DATOS_INCOMPLETOS) */
+.doc-item--faltante {
+  border-color: var(--warning);
+  background: var(--warning-bg);
+}
+.doc-item--faltante .doc-item__icon-wrap {
+  background: var(--warning-bg);
+  border-color: var(--warning);
+  color: var(--warning-ico);
+}
+
+/* Sección subir documento pendiente */
+.doc-item__upload {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Separador de sección faltantes */
+.modal-section-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 20px 0 10px;
+}
+
+/* Área y botón de re-enviar */
+.modal-reenviar {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.btn-reenviar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px 22px;
+  border: none;
+  border-radius: var(--radius-field);
+  background: var(--primary-dark);
+  color: var(--white);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+  box-shadow: 0 4px 14px -6px rgba(12, 61, 39, 0.45);
+}
+.btn-reenviar svg { width: 16px; height: 16px; }
+.btn-reenviar:hover { background: var(--primary-darker); }
 
 /* Badge tamaño pequeño */
 .badge--sm {

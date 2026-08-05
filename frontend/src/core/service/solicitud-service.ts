@@ -131,4 +131,24 @@ export class SolicitudService {
       }),
     );
   }
+
+  descargarDocumento(qrToken: string): void {
+    this.http
+      .get(`${this.API_URL}/documentos/descargar/${qrToken}`, { responseType: 'blob' })
+      .pipe(
+        catchError((error) => {
+          this.peticionError(error?.error?.detail ?? 'Error al descargar el comprobante');
+          return throwError(() => new Error('Error al descargar el comprobante'));
+        }),
+      )
+      .subscribe((blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const enlace = document.createElement('a');
+        enlace.href = url;
+        enlace.download = `comprobante_${qrToken}.pdf`;
+        enlace.click();
+        window.URL.revokeObjectURL(url);
+      });
+  }
+
 }

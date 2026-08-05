@@ -73,10 +73,11 @@ export interface MiSolicitudResponse {
 
 export interface SolicitudesEstudiante{
   estado_solicitud: string
-fecha_solicitud:string
-folio: string
-id_solicitud: string
-tipo_tramite :string
+  fecha_solicitud: string
+  folio: string
+  id_solicitud: string
+  tipo_tramite: string
+  qr_token?: string
 }
 
 export interface DocumentoDetalle {
@@ -98,4 +99,16 @@ export interface SolicitudDetallada {
 export interface SolicitudesDetalladasResponse {
   numero_cuenta: string;
   solicitudes: SolicitudDetallada[];
+}
+
+export interface Notificacion {
+  id_notificacion: number;
+  titulo: string;
+  mensaje: string;
+  leida: boolean;
+  fecha: string;
+}
+
+export interface NotificacionesResponse {
+  notificaciones: Notificacion[];
 }

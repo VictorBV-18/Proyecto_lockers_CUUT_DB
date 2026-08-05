@@ -42,6 +42,22 @@
                   >
                 </td>
                 <td class="td-actions">
+                  @if (sol.qr_token && sol.estado_solicitud === 'APROBADA') {
+                    <button
+                      type="button"
+                      class="icon-btn icon-btn--download"
+                      aria-label="Descargar comprobante"
+                      title="Descargar comprobante PDF"
+                      (click)="solicitudesUsuario.descargarDocumento(sol.qr_token)"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                      </svg>
+                    </button>
+                  }
                   <button
                     type="button"
                     class="icon-btn"
@@ -185,9 +201,85 @@
                     </div>
                   }
 
+                  @if (doc.estado_documento === 'PENDIENTE' && solicitudSeleccionada.estado_solicitud === 'DATOS_INCOMPLETOS') {
+                    <div class="doc-item__upload">
+                      <label class="btn-resubir"
+                             [class.btn-resubir--loading]="subiendoDocumento[doc.id_tipo_documento]">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                             stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="17 8 12 3 7 8"/>
+                          <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        {{ subiendoDocumento[doc.id_tipo_documento] ? 'Subiendo…' : 'Subir documento' }}
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          [disabled]="subiendoDocumento[doc.id_tipo_documento]"
+                          (change)="onResubirDocumento($event, doc.id_tipo_documento)"
+                        />
+                      </label>
+                    </div>
+                  }
+
                 </li>
               }
             </ul>
+          }
+
+          @if (getDocsFaltantes().length > 0) {
+            <p class="modal-section-label">Documentos faltantes</p>
+            <ul class="doc-list">
+              @for (doc of getDocsFaltantes(); track doc.id) {
+                <li class="doc-item doc-item--faltante">
+                  <div class="doc-item__top">
+                    <div class="doc-item__icon-wrap">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+                           stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+                      </svg>
+                    </div>
+                    <div class="doc-item__info">
+                      <span class="doc-item__name">{{ doc.nombre }}</span>
+                      <span class="badge badge--sm badge--warning">
+                        <i class="dot"></i>Faltante
+                      </span>
+                    </div>
+                  </div>
+                  <div class="doc-item__upload">
+                    <label class="btn-resubir"
+                           [class.btn-resubir--loading]="subiendoDocumento[doc.id]">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                           stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                      </svg>
+                      {{ subiendoDocumento[doc.id] ? 'Subiendo…' : 'Subir documento' }}
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        [disabled]="subiendoDocumento[doc.id]"
+                        (change)="onResubirDocumento($event, doc.id)"
+                      />
+                    </label>
+                  </div>
+                </li>
+              }
+            </ul>
+          }
+
+          @if (solicitudSeleccionada.estado_solicitud === 'DATOS_INCOMPLETOS') {
+            <div class="modal-reenviar">
+              <button type="button" class="btn-reenviar" (click)="reenviarSolicitud()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                </svg>
+                Re-enviar Solicitud
+              </button>
+            </div>
           }
 
         }
