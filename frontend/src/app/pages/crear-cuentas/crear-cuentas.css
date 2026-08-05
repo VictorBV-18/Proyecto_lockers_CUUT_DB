@@ -1,0 +1,128 @@
+.page-header  { margin-bottom: 1.5rem; }
+.page-title   { font-size: 1.5rem; font-weight: 700; color: var(--primary-dark); margin: 0 0 0.25rem; }
+.page-desc    { color: var(--text-soft); font-size: 0.9rem; }
+
+.config-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  margin-bottom: 1.25rem;
+}
+
+.card-title { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 0.2rem; }
+.card-desc { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1rem; }
+
+/* ── Selector de tipo de cuenta ───────────── */
+.tipo-cuenta-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.tipo-cuenta-btn {
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid var(--field-line);
+  background: var(--field-bg);
+  color: var(--text-soft);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.tipo-cuenta-btn:hover { border-color: var(--primary); color: var(--primary-dark); }
+.tipo-cuenta-btn--activo {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.tipo-cuenta-btn--activo:hover { color: #fff; }
+
+/* ── Formulario ───────────────────────────── */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.form-field--password { grid-column: 1 / -1; }
+
+.field-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.4rem;
+}
+
+.field-input {
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--field-line);
+  border-radius: var(--radius-field);
+  background: var(--field-bg);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  color: var(--text);
+  outline: none;
+}
+.field-input:focus { border-color: var(--primary); }
+
+.password-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.6rem;
+}
+.password-row .field-input { font-family: 'Courier New', monospace; letter-spacing: 0.05em; }
+
+.btn-icon {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-field);
+  border: 1px solid var(--field-line);
+  background: var(--field-bg);
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-icon svg { width: 18px; height: 18px; }
+.btn-icon:hover:not(:disabled) { border-color: var(--primary); color: var(--primary-dark); }
+.btn-icon:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn {
+  padding: 0.55rem 1rem;
+  border-radius: var(--radius-field);
+  border: none;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn--primary { background: var(--primary); color: #fff; }
+.btn--primary:hover { background: var(--primary-dark); }
+.btn--secondary { background: var(--field-bg); color: var(--text); border: 1px solid var(--field-line); }
+.btn--secondary:hover { border-color: var(--primary); color: var(--primary-dark); }
+.btn--mt { margin-top: 0.5rem; }
+.btn--mt-sm { margin-top: 0.15rem; }
+
+.alert-success {
+  background: var(--success-bg);
+  color: #1e7a6f;
+  border-radius: var(--radius-field);
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  margin-bottom: 1.1rem;
+}
+
+@media (max-width: 768px) {
+  .form-grid { grid-template-columns: 1fr; }
+}

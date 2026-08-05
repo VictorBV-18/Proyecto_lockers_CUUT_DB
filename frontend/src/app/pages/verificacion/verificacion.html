@@ -1,10 +1,92 @@
 <div class="page-header">
   <h1 class="page-title">Verificar Accesos</h1>
-  <p class="page-desc">Verifica credenciales y valida el acceso a lockers y estacionamiento.</p>
-</div>
-<div class="empty-card">
-  <div class="empty-icon">✅</div>
-  <p class="empty-title">Sin registros de acceso</p>
-  <p class="empty-text">No hay accesos pendientes de verificación.</p>
+  <p class="page-desc">Escanea el QR del tarjetón para validar el acceso a lockers y estacionamiento.</p>
 </div>
 
+<div class="scanner-card">
+  <!-- Estado inicial -->
+  <div class="scanner-idle" *ngIf="estado === 'idle'">
+    <div class="scanner-idle-icon">📷</div>
+    <p class="scanner-idle-title">Listo para escanear</p>
+    <p class="scanner-idle-text">Apunta la cámara al código QR del tarjetón del alumno.</p>
+    <button class="btn btn--primary" (click)="iniciarEscaneo()">Iniciar escaneo</button>
+    <p class="scanner-error" *ngIf="errorCamara">{{ errorCamara }}</p>
+  </div>
+
+  <!-- Cámara (se mantiene en el DOM para no perder la referencia del <video>) -->
+  <div class="scanner-video-wrap" [class.hidden]="estado !== 'escaneando' && estado !== 'procesando'">
+    <video #video class="scanner-video" muted playsinline></video>
+    <div class="scanner-frame"></div>
+    <div class="scanner-overlay" *ngIf="estado === 'procesando'">
+      <span>Verificando…</span>
+    </div>
+  </div>
+  <button class="btn btn--outline btn--cancelar" *ngIf="estado === 'escaneando'" (click)="cancelarEscaneo()">
+    Cancelar
+  </button>
+
+  <!-- Resultado -->
+  <div
+    class="result-card"
+    *ngIf="estado === 'resultado'"
+    [class.result-card--valido]="resultadoValido"
+    [class.result-card--invalido]="!resultadoValido"
+  >
+    <div class="result-icon">{{ resultadoValido ? '✅' : '❌' }}</div>
+    <p class="result-title">{{ resultadoValido ? 'Acceso válido' : 'Acceso no válido' }}</p>
+
+    <div class="result-datos" *ngIf="datosAlumno">
+      <div class="result-row"><span>Alumno</span><strong>{{ datosAlumno.nombre_completo }}</strong></div>
+      <div class="result-row"><span>No. Cuenta</span><strong>{{ datosAlumno.numero_cuenta }}</strong></div>
+      <div class="result-row"><span>Trámite</span><strong>{{ datosAlumno.tipo_tramite }}</strong></div>
+      <div class="result-row"><span>Vigencia</span><strong>{{ datosAlumno.vigencia }}</strong></div>
+      <div class="result-row" *ngIf="datosAlumno.recurso">
+        <span>Recurso</span><strong>{{ datosAlumno.recurso.codigo }} · {{ datosAlumno.recurso.ubicacion }}</strong>
+      </div>
+      <div class="result-row"><span>Estado</span><strong>{{ datosAlumno.estado }}</strong></div>
+    </div>
+
+    <p class="scanner-error" *ngIf="mensajeError">{{ mensajeError }}</p>
+
+    <button class="btn btn--primary" (click)="escanearSiguiente()">Escanear siguiente</button>
+  </div>
+
+  <canvas #canvas class="hidden"></canvas>
+</div>
+
+<!-- Historial de verificaciones del turno -->
+<div class="historial-section">
+  <h2 class="section-title">Historial de verificaciones del turno</h2>
+
+  <div class="table-card">
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Hora</th>
+            <th>Alumno</th>
+            <th>No. Cuenta</th>
+            <th>Trámite</th>
+            <th>Resultado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of historialTurno">
+            <td class="td-date">{{ item.hora }}</td>
+            <td class="td-name">{{ item.nombre_completo }}</td>
+            <td>{{ item.numero_cuenta }}</td>
+            <td>{{ item.tipo_tramite }}</td>
+            <td>
+              <span class="badge" [ngClass]="item.resultado === 'VALIDO' ? 'badge--success' : 'badge--danger'">
+                {{ item.resultado === 'VALIDO' ? 'Válido' : 'No válido' }}
+              </span>
+            </td>
+          </tr>
+          <tr *ngIf="historialTurno.length === 0">
+            <td colspan="5" class="td-empty">Aún no hay verificaciones registradas en este turno.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
