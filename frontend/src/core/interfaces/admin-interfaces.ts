@@ -110,3 +110,6 @@ export interface RequisitoMock {
   obligatorio: boolean;
   tramiteAsociado: string;
 }
+
+// Interfaces para la creación de cuentas (diseño front, aún sin conectar al backend)
+export type TipoCuentaNueva = 'ADMIN' | 'DOCENTE' | 'ALUMNO' | 'GUARDIA';

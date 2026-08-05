@@ -1,0 +1,123 @@
+<div class="page-header">
+  <h1 class="page-title">Crear Cuentas</h1>
+  <p class="page-desc">Registra nuevas cuentas de administrador, docente, alumno o guardia.</p>
+</div>
+
+<div class="config-card">
+  <h3 class="card-title">Tipo de cuenta</h3>
+  <p class="card-desc">Selecciona el perfil que deseas crear.</p>
+
+  <div class="tipo-cuenta-selector">
+    <button
+      type="button"
+      *ngFor="let t of tiposCuenta"
+      class="tipo-cuenta-btn"
+      [class.tipo-cuenta-btn--activo]="tipoCuenta === t.valor"
+      (click)="seleccionarTipo(t.valor)"
+    >
+      {{ t.label }}
+    </button>
+  </div>
+</div>
+
+<div class="config-card">
+  <h3 class="card-title">Datos de la cuenta</h3>
+  <p class="card-desc">Los campos marcados con * son obligatorios.</p>
+
+  <div *ngIf="mensajeExito" class="alert-success">{{ mensajeExito }}</div>
+
+  <div class="form-grid">
+    <div class="form-field">
+      <label class="field-label">Número de cuenta *</label>
+      <input type="text" class="field-input" [(ngModel)]="numeroCuenta" placeholder="Ej. 1234567" />
+    </div>
+
+    <div class="form-field">
+      <label class="field-label">Nombre *</label>
+      <input type="text" class="field-input" [(ngModel)]="nombre" placeholder="Nombre(s)" />
+    </div>
+
+    <div class="form-field">
+      <label class="field-label">Apellidos *</label>
+      <input type="text" class="field-input" [(ngModel)]="apellidos" placeholder="Apellidos" />
+    </div>
+
+    <div class="form-field">
+      <label class="field-label">Correo electrónico *</label>
+      <input
+        type="email"
+        class="field-input"
+        [(ngModel)]="correo"
+        placeholder="correo@ejemplo.com"
+      />
+    </div>
+
+    <div class="form-field" *ngIf="tipoCuenta === 'ALUMNO'">
+      <label class="field-label">Carrera *</label>
+      <select name="miLista" id="opciones" class="field-input" [(ngModel)]="carrera">
+        <option value="" disabled selected>Selecciona una carrera</option>
+        <option value="ISW">Ingenieria en Software</option>
+        <option value="ICO" >Ingenieria en Computación</option>
+        <option value="IPI">Ingenieria en Procesos Industriales</option>
+      </select>
+    </div>
+
+    <div class="form-field form-field--password">
+      <label class="field-label">Contraseña generada *</label>
+      <div class="password-row">
+        <input
+          [type]="mostrarContrasena ? 'text' : 'password'"
+          class="field-input"
+          [ngModel]="contrasenaGenerada"
+          readonly
+          placeholder="Genera una contraseña"
+        />
+        <button
+          type="button"
+          class="btn-icon"
+          title="Mostrar/ocultar contraseña"
+          [disabled]="!contrasenaGenerada"
+          (click)="mostrarContrasena = !mostrarContrasena"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="btn-icon"
+          title="Copiar contraseña"
+          [disabled]="!contrasenaGenerada"
+          (click)="copiarContrasena()"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect x="9" y="9" width="13" height="13" rx="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+        </button>
+      </div>
+      <button type="button" class="btn btn--secondary btn--mt-sm" (click)="generarContrasena()">
+        Generar contraseña
+      </button>
+    </div>
+  </div>
+
+  <button type="button" class="btn btn--primary btn--mt" (click)="crearCuenta()">
+    Crear cuenta de {{ getTipoLabel(tipoCuenta) | lowercase }}
+  </button>
+</div>
