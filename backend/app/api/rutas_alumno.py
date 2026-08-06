@@ -16,7 +16,6 @@ if not os.path.exists(CARPETA_UPLOADS):
 class SolicitudCrear(BaseModel):
     numero_cuenta: str
     tipo_tramite: str 
-    correo_electronico: str
     placas: Optional[str] = None
     modelo: Optional[str] = None
     color: Optional[str] = None
@@ -50,11 +49,6 @@ def crear_solicitud(solicitud: SolicitudCrear):
             raise HTTPException(status_code=404, detail="El número de cuenta no existe en el sistema.")
             
         id_alumno_real = alumno_bd[0]
-
-        cursor.execute(
-            "UPDATE alumno SET correo_electronico = %s WHERE id_alumno = %s", 
-            (solicitud.correo_electronico, id_alumno_real)
-        )
 
         cursor.execute(
             """
