@@ -279,7 +279,7 @@ def finalizar_solicitud(id_solicitud: int):
 
 
 
-@router.get("/solicitudes/{numero_cuenta}/general", tags=["Alumno"], summary="Obtener (folio, tramite, fecha, estado) de manera general del alumno")
+@router.get("/solicitudes/{numero_cuenta}/general", tags=["Alumno"], summary="Obtener (folio, tramite, fecha, estado, qr_token) de manera general del alumno")
 def resumen_solicitud(numero_cuenta: str):
     conexion = conectar_base()
     if conexion is None:
@@ -298,10 +298,17 @@ def resumen_solicitud(numero_cuenta: str):
         id_alumno = alumno[0]
 
         cursor.execute("""
-            SELECT id_solicitud, tipo_tramite, fecha_solicitud, estado 
-            FROM solicitud 
-            WHERE id_alumno = %s
-            ORDER BY fecha_solicitud DESC
+            SELECT 
+                s.id_solicitud, 
+                s.tipo_tramite, 
+                s.fecha_solicitud, 
+                s.estado,
+                c.qr_token
+            FROM solicitud s
+            LEFT JOIN asignacion asg ON s.id_solicitud = asg.id_solicitud
+            LEFT JOIN constancia c ON asg.id_asignacion = c.id_asignacion
+            WHERE s.id_alumno = %s
+            ORDER BY s.fecha_solicitud DESC
         """, (id_alumno,))
 
         filas = cursor.fetchall()
@@ -313,7 +320,8 @@ def resumen_solicitud(numero_cuenta: str):
                 "folio": f"FOL-{fila[0]:04d}", 
                 "tipo_tramite": fila[1],
                 "fecha_solicitud": fila[2],
-                "estado_solicitud": fila[3]
+                "estado_solicitud": fila[3],
+                "qr_token": str(fila[4]) if fila[4] else None
             })
 
         cursor.close()
