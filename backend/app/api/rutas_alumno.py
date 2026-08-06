@@ -321,7 +321,7 @@ def resumen_solicitud(numero_cuenta: str):
                 "tipo_tramite": fila[1],
                 "fecha_solicitud": fila[2],
                 "estado_solicitud": fila[3],
-                "qr_token": str(fila[4]) if fila[4] else None
+                "qr_token": str(fila[4]) if fila[4] else None 
             })
 
         cursor.close()
@@ -550,6 +550,48 @@ def obtener_recursos_activos(numero_cuenta: str):
             
         return {"numero_cuenta": numero_cuenta, "recursos_activos": recursos}
 
+    except Exception as e:
+        if conexion:
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+    
+
+
+
+@router.get("/alumno/{numero_cuenta}/mi-perfil", tags=["Alumno"], summary="Datos del perfil del alumno")
+def obtener_perfil_alumno(numero_cuenta: str):
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+        
+        cursor.execute("""
+            SELECT numero_cuenta, nombre, apellidos, carrera, correo_electronico, estado_activo
+            FROM alumno
+            WHERE numero_cuenta = %s
+        """, (numero_cuenta,))
+        
+        alumno = cursor.fetchone()
+        
+        cursor.close()
+        conexion.close()
+        
+        if not alumno:
+            raise HTTPException(status_code=404, detail="Alumno no encontrado.")
+            
+        return {
+            "numero_cuenta": alumno[0],
+            "nombre (s)": alumno[1],
+            "apellidos": alumno[2],
+            "carrera": alumno[3],
+            "correo_electronico": alumno[4],
+            "estado_activo": alumno[5]
+        }
+
+    except HTTPException:
+        raise
     except Exception as e:
         if conexion:
             conexion.close()
