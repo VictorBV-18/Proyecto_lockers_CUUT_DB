@@ -18,6 +18,7 @@ import { Verificacion }     from './pages/verificacion/verificacion';
 import { Notificaciones }   from './pages/notificaciones/notificaciones';
 import { AdminConfiguracion } from './pages/admin-configuracion/admin-configuracion';
 import { Auditoria }          from './pages/auditoria/auditoria';
+import { CrearCuentas }       from './pages/crear-cuentas/crear-cuentas';
 
 const routes: Routes = [
   { path: '',      redirectTo: 'login', pathMatch: 'full' },
@@ -33,6 +34,7 @@ const routes: Routes = [
       { path: 'reposiciones',    component: Reposiciones   },
       { path: 'dashboard',       component: AdminDashboard },
       { path: 'usuarios',        component: Usuarios       },
+      { path: 'crear-cuentas',   component: CrearCuentas   },
       { path: 'permisos-roles',  component: PermisosRoles  },
       { path: 'verificacion',    component: Verificacion   },
       { path: 'notificaciones',  component: Notificaciones },

@@ -23,6 +23,7 @@ import { Verificacion }     from './pages/verificacion/verificacion';
 import { Notificaciones }   from './pages/notificaciones/notificaciones';
 import { AdminConfiguracion } from './pages/admin-configuracion/admin-configuracion';
 import { Auditoria }          from './pages/auditoria/auditoria';
+import { CrearCuentas }       from './pages/crear-cuentas/crear-cuentas';
 
 @NgModule({
   declarations: [
@@ -44,6 +45,7 @@ import { Auditoria }          from './pages/auditoria/auditoria';
     Notificaciones,
     AdminConfiguracion,
     Auditoria,
+    CrearCuentas,
   ],
   imports: [
     BrowserModule,
