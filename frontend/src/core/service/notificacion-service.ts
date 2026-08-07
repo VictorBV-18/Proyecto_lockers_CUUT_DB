@@ -14,8 +14,8 @@ export class NotificacionService {
     constructor(private http: HttpClient) {}
 
 
-    notificaciones(numeroCuenta: string, rol: string): Observable<NotificacionesResponse> {
-      return this.http.get<NotificacionesResponse>(`${this.API_URL}/notificaciones/${numeroCuenta}?rol=${rol}`).pipe(
+    notificaciones(numeroCuenta: string, rol: string, page: number = 1): Observable<NotificacionesResponse> {
+      return this.http.get<NotificacionesResponse>(`${this.API_URL}/notificaciones/${numeroCuenta}?rol=${rol}&page=${page}`).pipe(
         catchError((error) => {
            return throwError(() => error);
         })

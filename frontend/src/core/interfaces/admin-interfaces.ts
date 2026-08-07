@@ -11,7 +11,11 @@ export interface SolicitudAdmin {
 }
 
 export interface SolicitudesResponse {
-  solicitudes: SolicitudAdmin[];
+  pagina_actual: number;
+  registros_por_pagina: number;
+  total_registros: number;
+  total_paginas: number;
+  resultados: SolicitudAdmin[];
 }
 
 export interface InventarioLockersResponse {

@@ -1,0 +1,74 @@
+<div class="page-header">
+  <h1 class="page-title">Mi Perfil</h1>
+  <p class="page-desc">Consulta los datos de tu vehículo y actualiza tu contraseña.</p>
+</div>
+
+@if (vehiculo) {
+  <div class="config-card">
+    <h3 class="card-title">Información del Vehículo</h3>
+    <p class="card-desc">Datos registrados en tu trámite de estacionamiento activo.</p>
+
+    <div class="form-grid">
+      <div class="form-field">
+        <label class="field-label">Placas</label>
+        <input type="text" class="field-input" [value]="vehiculo.detalles_recurso.placas" readonly />
+      </div>
+      <div class="form-field">
+        <label class="field-label">Modelo</label>
+        <input type="text" class="field-input" [value]="vehiculo.detalles_recurso.modelo" readonly />
+      </div>
+      <div class="form-field">
+        <label class="field-label">Color</label>
+        <input type="text" class="field-input" [value]="vehiculo.detalles_recurso.color" readonly />
+      </div>
+    </div>
+  </div>
+}
+
+<div class="config-card">
+  <h3 class="card-title">Cambiar Contraseña</h3>
+  <p class="card-desc">Ingresa tu contraseña actual y define una nueva.</p>
+
+  <div class="form-grid">
+    <div class="form-field">
+      <label class="field-label">Contraseña actual *</label>
+      <input
+        type="password"
+        class="field-input"
+        [(ngModel)]="contrasenaActual"
+        placeholder="Contraseña actual"
+      />
+    </div>
+
+    <div class="form-field"></div>
+
+    <div class="form-field">
+      <label class="field-label">Contraseña nueva *</label>
+      <input
+        type="password"
+        class="field-input"
+        [(ngModel)]="contrasenaNueva"
+        placeholder="Nueva contraseña"
+      />
+    </div>
+
+    <div class="form-field">
+      <label class="field-label">Confirmar contraseña nueva *</label>
+      <input
+        type="password"
+        class="field-input"
+        [(ngModel)]="confirmarContrasena"
+        placeholder="Confirma la nueva contraseña"
+      />
+    </div>
+  </div>
+
+  <button
+    type="button"
+    class="btn btn--primary btn--mt"
+    [disabled]="guardandoContrasena"
+    (click)="cambiarContrasena()"
+  >
+    {{ guardandoContrasena ? 'Guardando…' : 'Actualizar contraseña' }}
+  </button>
+</div>

@@ -1,4 +1,5 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
+import { DomSanitizer } from '@angular/platform-browser';
 import {
   SolicitudResumen,
   NuevaSolicitudPayload,
@@ -11,6 +12,11 @@ import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
 
 const ESTADOS_ACTIVOS = ['PENDIENTE', 'EN_REVISION', 'APROBADA', 'DATOS_INCOMPLETOS'];
+
+// Estados de una solicitud que aún no ha sido validada (aprobada). Mientras
+// exista una solicitud de OTRO trámite en alguno de estos estados, no se
+// puede iniciar una nueva solicitud del trámite contrario.
+const ESTADOS_SIN_VALIDAR = ['PENDIENTE', 'EN_REVISION', 'DATOS_INCOMPLETOS'];
 
 type TipoSolicitud = '' | TipoSolicitudApi;
 
@@ -48,20 +54,41 @@ const DOC_ICONS: Record<string, string> = {
   templateUrl: './nueva-solicitud.html',
   styleUrl: './nueva-solicitud.css',
 })
-export class NuevaSolicitud {
+export class NuevaSolicitud implements OnDestroy {
   tipoSolicitud: TipoSolicitud = '';
   documentos: DocumentoRequerido[] = [];
   enviando = false;
   idSolicitudActual: number | null = null;
   numeroCuenta = localStorage.getItem('numeroCuenta') || '';
 
+  // Documento cuya vista previa está abierta en el modal (null = modal cerrado).
+  docEnPreview: DocumentoRequerido | null = null;
+
+  // URLs de objeto (blob:) generadas para las vistas previas, indexadas igual
+  // que `documentos`, para poder liberarlas con URL.revokeObjectURL().
+  private previewObjectUrls: (string | null)[] = [];
+
+  // Datos del vehículo, obligatorios para tramitar un estacionamiento.
+  placas = '';
+  modelo = '';
+  color = '';
+
+  get mostrarFormVehiculo(): boolean {
+    return this.tipoSolicitud === 'estacionamiento' && this.idSolicitudActual === null;
+  }
+
   constructor(
     private solicitudService: SolicitudService,
     private router: Router,
+    private sanitizer: DomSanitizer,
   ) {}
 
   ngOnInit(): void {
     this.solicitudService.listarMisSolicitudes(this.numeroCuenta).subscribe();
+  }
+
+  ngOnDestroy(): void {
+    this.revocarTodasLasPreviews();
   }
 
   get hayEstacionamientoActiva(): boolean {
@@ -76,15 +103,49 @@ export class NuevaSolicitud {
       .some((s) => s.tipo_tramite === 'locker' && ESTADOS_ACTIVOS.includes(s.estado_solicitud));
   }
 
+  // Bloquea "estacionamiento" si hay una solicitud de locker sin validar todavía.
+  get hayLockerSinValidar(): boolean {
+    return this.solicitudService
+      .misTramites()
+      .some((s) => s.tipo_tramite === 'locker' && ESTADOS_SIN_VALIDAR.includes(s.estado_solicitud));
+  }
+
+  // Bloquea "locker" si hay una solicitud de estacionamiento sin validar todavía.
+  get hayEstacionamientoSinValidar(): boolean {
+    return this.solicitudService
+      .misTramites()
+      .some((s) => s.tipo_tramite === 'estacionamiento' && ESTADOS_SIN_VALIDAR.includes(s.estado_solicitud));
+  }
+
   onTipoChange(): void {
+    this.revocarTodasLasPreviews();
     this.documentos = [];
     this.idSolicitudActual = null;
+    this.placas = '';
+    this.modelo = '';
+    this.color = '';
 
     if (this.tipoSolicitud === '') {
       return;
     }
 
     const tipoSeleccionado = this.tipoSolicitud;
+
+    if (tipoSeleccionado === 'estacionamiento' && this.hayLockerSinValidar) {
+      this.solicitudService.peticionError(
+        'Ya tienes una solicitud de locker sin validar. Espera a que sea validada antes de solicitar estacionamiento.',
+      );
+      this.tipoSolicitud = '';
+      return;
+    }
+
+    if (tipoSeleccionado === 'locker' && this.hayEstacionamientoSinValidar) {
+      this.solicitudService.peticionError(
+        'Ya tienes una solicitud de estacionamiento sin validar. Espera a que sea validada antes de solicitar locker.',
+      );
+      this.tipoSolicitud = '';
+      return;
+    }
 
     Swal.fire({
       title: `¿Estás seguro que quieres iniciar una solicitud de ${tipoSeleccionado}?`,
@@ -95,19 +156,38 @@ export class NuevaSolicitud {
       cancelButtonColor: '#d33',
       confirmButtonText: 'Si!',
     }).then((result) => {
-      if (result.isConfirmed) {
-        this.solicitudService.crearSolicitud(this.construirPayload(tipoSeleccionado)).subscribe({
-          next: (response) => {
-            this.idSolicitudActual = response.id_solicitud;
-            this.documentos = this.construirDocumentos(tipoSeleccionado);
-          },
-          error: () => {
-            this.tipoSolicitud = '';
-          },
-        });
-      } else {
+      if (!result.isConfirmed) {
         this.tipoSolicitud = '';
+        return;
       }
+
+      // Para estacionamiento primero se piden los datos del vehículo;
+      // la solicitud se crea hasta confirmarVehiculo().
+      if (tipoSeleccionado === 'estacionamiento') {
+        return;
+      }
+
+      this.crearSolicitudEnBackend(tipoSeleccionado);
+    });
+  }
+
+  confirmarVehiculo(): void {
+    if (!this.placas.trim() || !this.modelo.trim() || !this.color.trim()) {
+      alert('Completa placas, modelo y color del vehículo para continuar.');
+      return;
+    }
+    this.crearSolicitudEnBackend('estacionamiento');
+  }
+
+  private crearSolicitudEnBackend(tipo: TipoSolicitudApi): void {
+    this.solicitudService.crearSolicitud(this.construirPayload(tipo)).subscribe({
+      next: (response) => {
+        this.idSolicitudActual = response.id_solicitud;
+        this.documentos = this.construirDocumentos(tipo);
+      },
+      error: () => {
+        this.tipoSolicitud = '';
+      },
     });
   }
 
@@ -116,21 +196,61 @@ export class NuevaSolicitud {
     const file = input.files && input.files[0];
     if (!file) return;
 
+    this.revocarPreview(idx);
+
     if (file.size > MAX_FILE_SIZE) {
       const sizeMb = (file.size / 1024 / 1024).toFixed(1);
       this.documentos[idx].archivo = null;
+      this.documentos[idx].previewUrl = null;
       this.documentos[idx].error =
         `Archivo demasiado grande (${sizeMb} MB). Máximo permitido: 5 MB.`;
     } else {
       this.documentos[idx].archivo = file;
       this.documentos[idx].error = null;
+
+      const objectUrl = URL.createObjectURL(file);
+      this.previewObjectUrls[idx] = objectUrl;
+      this.documentos[idx].previewUrl = this.sanitizer.bypassSecurityTrustResourceUrl(objectUrl);
     }
     input.value = '';
   }
 
   removeFile(idx: number): void {
+    this.revocarPreview(idx);
     this.documentos[idx].archivo = null;
+    this.documentos[idx].previewUrl = null;
     this.documentos[idx].error = null;
+    if (this.docEnPreview === this.documentos[idx]) {
+      this.docEnPreview = null;
+    }
+  }
+
+  esImagen(doc: DocumentoRequerido): boolean {
+    return !!doc.archivo && doc.archivo.type.startsWith('image/');
+  }
+
+  abrirPreview(doc: DocumentoRequerido): void {
+    if (doc.previewUrl) {
+      this.docEnPreview = doc;
+    }
+  }
+
+  cerrarPreview(): void {
+    this.docEnPreview = null;
+  }
+
+  private revocarPreview(idx: number): void {
+    const url = this.previewObjectUrls[idx];
+    if (url) {
+      URL.revokeObjectURL(url);
+      this.previewObjectUrls[idx] = null;
+    }
+  }
+
+  private revocarTodasLasPreviews(): void {
+    this.previewObjectUrls.forEach((url) => url && URL.revokeObjectURL(url));
+    this.previewObjectUrls = [];
+    this.docEnPreview = null;
   }
 
   todosDocumentosListos(): boolean {
@@ -203,16 +323,25 @@ export class NuevaSolicitud {
   }
 
   private construirPayload(tipo: TipoSolicitudApi): NuevaSolicitudPayload {
-    return {
+    const payload: NuevaSolicitudPayload = {
       numero_cuenta: localStorage.getItem('numeroCuenta') || '',
       tipo_tramite: tipo,
       observacion: '',
       correo_electronico: 'pepito@pepito.com',
     };
+
+    if (tipo === 'estacionamiento') {
+      payload.placas = this.placas.trim();
+      payload.modelo = this.modelo.trim();
+      payload.color = this.color.trim();
+    }
+
+    return payload;
   }
 
   private construirDocumentos(tipo: TipoSolicitudApi): DocumentoRequerido[] {
     const fuente = tipo === 'estacionamiento' ? DOCS_ESTACIONAMIENTO : DOCS_LOCKER;
+    this.previewObjectUrls = fuente.map(() => null);
     return fuente.map((d) => ({
       id: d.id,
       idTipoDocumento: d.idTipoDocumento,
@@ -220,6 +349,7 @@ export class NuevaSolicitud {
       formatos: FORMATO_DEFAULT,
       archivo: null,
       error: null,
+      previewUrl: null,
     }));
   }
 }

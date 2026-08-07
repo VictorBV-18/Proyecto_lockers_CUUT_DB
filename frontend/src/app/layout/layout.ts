@@ -13,6 +13,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: 'Mis Solicitudes',   route: '/home/mis-solicitudes', icon: 'list'          },
     { label: 'Nueva Solicitud',   route: '/home/nueva-solicitud', icon: 'plus'          },
     { label: 'Notificaciones',    route: '/home/notificaciones',  icon: 'bell'          },
+    { label: 'Mi Perfil',         route: '/home/mi-perfil',       icon: 'user'          },
   ],
   revisor: [
     { label: 'Solicitudes',       route: '/home/solicitudes',     icon: 'inbox'         },
@@ -115,6 +116,7 @@ export class Layout implements OnInit {
       'check-circle': 'M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3',
       settings:       'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z',
       clipboard:      'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 2h6v4H9V2M12 11h4M12 16h4M8 11h.01M8 16h.01',
+      user:           'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
       logout:         'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
     };
     return icons[name] || '';

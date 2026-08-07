@@ -24,6 +24,7 @@ import { Notificaciones }   from './pages/notificaciones/notificaciones';
 import { AdminConfiguracion } from './pages/admin-configuracion/admin-configuracion';
 import { Auditoria }          from './pages/auditoria/auditoria';
 import { CrearCuentas }       from './pages/crear-cuentas/crear-cuentas';
+import { MiPerfil }           from './pages/mi-perfil/mi-perfil';
 
 @NgModule({
   declarations: [
@@ -46,6 +47,7 @@ import { CrearCuentas }       from './pages/crear-cuentas/crear-cuentas';
     AdminConfiguracion,
     Auditoria,
     CrearCuentas,
+    MiPerfil,
   ],
   imports: [
     BrowserModule,

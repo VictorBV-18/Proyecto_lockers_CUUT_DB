@@ -14,6 +14,9 @@ export class Notificaciones implements OnInit {
 
   notificaciones: Notificacion[] = [];
   cargando = false;
+  cargandoMas = false;
+  paginaActual = 1;
+  totalPaginas = 1;
 
   constructor(
     private notificacionService: NotificacionService,
@@ -21,22 +24,38 @@ export class Notificaciones implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.cargarNotificaciones();
+    this.cargarNotificaciones(1);
   }
 
-  cargarNotificaciones(): void {
-    this.cargando = true;
-    this.notificacionService.notificaciones(this.numeroCuenta, this.rolUsuario).subscribe({
+  get hayMasNotificaciones(): boolean {
+    return this.paginaActual < this.totalPaginas;
+  }
+
+  cargarNotificaciones(page: number): void {
+    this.cargando = page === 1;
+    this.cargandoMas = page > 1;
+    this.notificacionService.notificaciones(this.numeroCuenta, this.rolUsuario, page).subscribe({
       next: (response) => {
-        this.notificaciones = response.notificaciones;
+        this.notificaciones =
+          page === 1 ? response.resultados : [...this.notificaciones, ...response.resultados];
+        this.paginaActual = response.pagina_actual;
+        this.totalPaginas = response.total_paginas;
         this.cargando = false;
+        this.cargandoMas = false;
         this.cdr.detectChanges();
       },
       error: () => {
         this.cargando = false;
+        this.cargandoMas = false;
         this.cdr.detectChanges();
       },
     });
+  }
+
+  cargarMas(): void {
+    if (this.hayMasNotificaciones && !this.cargandoMas) {
+      this.cargarNotificaciones(this.paginaActual + 1);
+    }
   }
 
   marcarLeida(notificacion: Notificacion): void {

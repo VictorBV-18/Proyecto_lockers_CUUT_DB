@@ -121,6 +121,30 @@
   max-width: 880px;
 }
 
+/* ---------- Cargar más ---------- */
+.notif-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+.btn-cargar-mas {
+  padding: 10px 24px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--white);
+  color: var(--primary);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-cargar-mas:hover:not(:disabled) {
+  background: var(--success-bg);
+}
+.btn-cargar-mas:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 720px) {
   .notificaciones { padding: 24px 18px 36px; }

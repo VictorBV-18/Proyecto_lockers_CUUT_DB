@@ -3,6 +3,9 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, of, throwError } from 'rxjs';
 import { catchError, delay, tap } from 'rxjs/operators';
 import {
+  CambiarContrasenaPayload,
+  CambiarContrasenaResponse,
+  DetallesTramiteResponse,
   FinalizarSolicitudResponse,
   MiSolicitudResponse,
   NuevaSolcitudResponse,
@@ -130,6 +133,31 @@ export class SolicitudService {
         return throwError(() => new Error('Error al obtener los documentos'));
       }),
     );
+  }
+
+  obtenerDetallesTramite(numeroCuenta: string): Observable<DetallesTramiteResponse> {
+    return this.http
+      .get<DetallesTramiteResponse>(`${this.API_URL}/alumno/${numeroCuenta}/detalles-tramite`)
+      .pipe(
+        catchError(({ error }) => {
+          this.peticionError(error?.detail ?? 'Error al obtener los datos del vehículo');
+          return throwError(() => new Error('Error al obtener los datos del vehículo'));
+        }),
+      );
+  }
+
+  cambiarContrasena(
+    numeroCuenta: string,
+    payload: CambiarContrasenaPayload,
+  ): Observable<CambiarContrasenaResponse> {
+    return this.http
+      .put<CambiarContrasenaResponse>(`${this.API_URL}/alumno/${numeroCuenta}/contraseña`, payload)
+      .pipe(
+        catchError(({ error }) => {
+          this.peticionError(error?.detail ?? 'Error al cambiar la contraseña');
+          return throwError(() => new Error('Error al cambiar la contraseña'));
+        }),
+      );
   }
 
   descargarDocumento(qrToken: string): void {

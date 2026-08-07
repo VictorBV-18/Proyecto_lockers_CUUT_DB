@@ -1,3 +1,5 @@
+import { SafeResourceUrl } from '@angular/platform-browser';
+
 export type TipoSolicitudApi   = 'estacionamiento' | 'locker';
 export type EstadoSolicitudApi = 'en_revision' | 'aprobada' | 'rechazada' | 'pendiente';
 export type TipoDocumento = [
@@ -10,7 +12,12 @@ export type TipoDocumento = [
 export interface loginResponse{
   mensaje:string
   rol: string,
-  id_admin?: number,
+  datos_usuario: {
+    id: number,
+    nombre_completo: string,
+    numero_cuenta: string,
+    correo: string,
+  },
 }
 
 
@@ -20,6 +27,9 @@ export interface NuevaSolicitudPayload {
   tipo_tramite:  TipoSolicitudApi;
   observacion: string | null
   correo_electronico: string
+  placas?: string
+  modelo?: string
+  color?: string
 }
 export interface NuevaSolicitudResponse {
   mensaje : string,
@@ -64,6 +74,7 @@ export interface DocumentoRequerido {
   formatos: string;
   archivo: File | null;
   error: string | null;
+  previewUrl: SafeResourceUrl | null;
 }
 
 export interface MiSolicitudResponse {
@@ -110,5 +121,48 @@ export interface Notificacion {
 }
 
 export interface NotificacionesResponse {
-  notificaciones: Notificacion[];
+  pagina_actual: number;
+  registros_por_pagina: number;
+  total_registros: number;
+  total_paginas: number;
+  resultados: Notificacion[];
+}
+
+export interface DocumentoRecursoActivo {
+  folio: string;
+  qr_token: string;
+  vigencia: string;
+  estado: string;
+  url_descarga: string;
+  documento_path: string | null;
+}
+
+export interface DetalleRecurso {
+  placas?: string;
+  modelo?: string;
+  color?: string;
+  codigo_locker?: string;
+  ubicacion?: string;
+}
+
+export interface RecursoActivo {
+  id_solicitud: number;
+  tipo_tramite: TipoSolicitudApi;
+  fecha_asignacion: string;
+  documento: DocumentoRecursoActivo | null;
+  detalles_recurso: DetalleRecurso;
+}
+
+export interface DetallesTramiteResponse {
+  numero_cuenta: string;
+  recursos_activos: RecursoActivo[];
+}
+
+export interface CambiarContrasenaPayload {
+  contrasena_actual: string;
+  contrasena_nueva: string;
+}
+
+export interface CambiarContrasenaResponse {
+  mensaje: string;
 }
