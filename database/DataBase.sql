@@ -12,7 +12,6 @@ DROP TABLE IF EXISTS locker CASCADE;
 DROP TABLE IF EXISTS admin CASCADE;
 DROP TABLE IF EXISTS alumno CASCADE;
 
--- Tabla alumno 
 CREATE TABLE alumno (
     id_alumno SERIAL PRIMARY KEY,
     numero_cuenta VARCHAR(20) UNIQUE NOT NULL,
@@ -24,7 +23,6 @@ CREATE TABLE alumno (
     estado_activo BOOLEAN NOT NULL DEFAULT TRUE 
 );
 
--- Tabla admin (CORREGIDO: El correo electrónico ahora permite nulos para los guardias)
 CREATE TABLE admin (
     id_admin SERIAL PRIMARY KEY,
     numero_cuenta VARCHAR(20) UNIQUE NOT NULL, 
@@ -97,17 +95,6 @@ CREATE TABLE historial_estados (
     CONSTRAINT fk_historial_admin FOREIGN KEY (id_admin) REFERENCES admin(id_admin)
 );
 
-CREATE TABLE revision (
-    id_revision SERIAL PRIMARY KEY,
-    id_solicitud INT NOT NULL,
-    id_admin INT NOT NULL,
-    fecha_revision TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    resultado VARCHAR(20) NOT NULL,
-    observacion TEXT,
-    CONSTRAINT fk_revision_solicitud FOREIGN KEY (id_solicitud) REFERENCES solicitud(id_solicitud),
-    CONSTRAINT fk_revision_admin FOREIGN KEY (id_admin) REFERENCES admin(id_admin)
-);
-
 CREATE TABLE asignacion (
     id_asignacion SERIAL PRIMARY KEY,
     id_solicitud INT NOT NULL UNIQUE,
@@ -119,7 +106,6 @@ CREATE TABLE asignacion (
 );
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
 CREATE TABLE constancia (
     id_constancia SERIAL PRIMARY KEY,
     id_asignacion INT NOT NULL UNIQUE,

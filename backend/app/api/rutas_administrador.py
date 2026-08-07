@@ -1033,3 +1033,85 @@ def ver_documento_subido(id_documento: int):
         if conexion:
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
+    
+
+
+
+@router.get("/admin/guardia/auditoria-accesos", tags=["Administrador / Personal"], summary="Ver historial de accesos registrados por los guardias separado por bloques de 20 en 20 )")
+def ver_auditoria_accesos(page: int = 1):
+    registros_por_pagina = 20
+    offset = (page - 1) * registros_por_pagina
+
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+        
+        cursor.execute("SELECT COUNT(*) FROM auditoria_acceso")
+        total_registros = cursor.fetchone()[0]
+
+        query = """
+            SELECT 
+                au.id_acceso,
+                au.fecha_hora,
+                au.identidad_confirmada,
+                au.vehiculo_coincide,
+                g.nombre || ' ' || g.apellidos AS nombre_guardia,
+                al.numero_cuenta AS cuenta_alumno,
+                al.nombre || ' ' || al.apellidos AS nombre_alumno,
+                s.tipo_tramite,
+                v.placas,
+                v.modelo
+            FROM auditoria_acceso au
+            JOIN admin g ON au.id_guardia = g.id_admin
+            JOIN asignacion ag ON au.id_asignacion = ag.id_asignacion
+            JOIN solicitud s ON ag.id_solicitud = s.id_solicitud
+            JOIN alumno al ON s.id_alumno = al.id_alumno
+            LEFT JOIN vehiculo_solicitud v ON s.id_solicitud = v.id_solicitud
+            ORDER BY au.fecha_hora DESC
+            LIMIT %s OFFSET %s
+        """
+        cursor.execute(query, (registros_por_pagina, offset))
+        filas = cursor.fetchall()
+
+        resultados = []
+        for fila in filas:
+            estado_acceso = "PERMITIDO" if fila[2] and fila[3] else "DENEGADO"
+            
+            resultados.append({
+                "id_acceso": fila[0],
+                "fecha_hora": fila[1],
+                "estado_acceso": estado_acceso,
+                "identidad_confirmada": fila[2],
+                "vehiculo_coincide": fila[3],
+                "guardia_turno": fila[4],
+                "alumno": {
+                    "numero_cuenta": fila[5],
+                    "nombre": fila[6]
+                },
+                "tramite": fila[7].upper(),
+                "vehiculo": {
+                    "placas": fila[8] if fila[8] else "N/A",
+                    "modelo": fila[9] if fila[9] else "N/A"
+                }
+            })
+
+        cursor.close()
+        conexion.close()
+
+        total_paginas = math.ceil(total_registros / registros_por_pagina) if total_registros > 0 else 1
+
+        return {
+            "pagina_actual": page,
+            "registros_por_pagina": registros_por_pagina,
+            "total_registros": total_registros,
+            "total_paginas": total_paginas,
+            "resultados": resultados
+        }
+
+    except Exception as e:
+        if conexion:
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
