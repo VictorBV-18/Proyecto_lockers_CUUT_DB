@@ -29,7 +29,7 @@ export class Login {
       });
       return;
     }
-    this.loginUser.login(this.numeroCuenta).subscribe();
+    this.loginUser.login(this.numeroCuenta, this.password).subscribe();
   }
   togglePassword() {
     this.mostrarPassword = !this.mostrarPassword;

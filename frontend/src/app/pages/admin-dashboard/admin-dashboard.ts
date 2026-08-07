@@ -47,14 +47,7 @@ export class AdminDashboard implements OnInit, AfterViewInit {
   }
 
   cargarDatos() {
-    this.adminService.obtenerTodasSolicitudes().subscribe({
-      next: (res) => {
-        this.solicitudes = res.solicitudes;
-        this.calcularKPIs();
-        setTimeout(() => this.renderizarGraficas(), 100);
-      },
-      error: (err) => console.error('Error cargando solicitudes:', err),
-    });
+    this.obtenerPaginaDeSolicitudes(1, []);
 
     this.adminService.obtenerInventarioLockers().subscribe({
       next: (res) => {
@@ -66,6 +59,24 @@ export class AdminDashboard implements OnInit, AfterViewInit {
         this.alertaBajaDisponibilidad = res.alerta_baja_disponibilidad;
       },
       error: (err) => console.error('Error cargando inventario:', err),
+    });
+  }
+
+  // El backend regresa las solicitudes paginadas de 20 en 20; se recorren todas
+  // las páginas para que los KPIs y las gráficas reflejen el total real.
+  private obtenerPaginaDeSolicitudes(page: number, acumulado: SolicitudAdmin[]) {
+    this.adminService.obtenerTodasSolicitudes({ page }).subscribe({
+      next: (res) => {
+        const combinado = [...acumulado, ...res.resultados];
+        if (page < res.total_paginas) {
+          this.obtenerPaginaDeSolicitudes(page + 1, combinado);
+        } else {
+          this.solicitudes = combinado;
+          this.calcularKPIs();
+          setTimeout(() => this.renderizarGraficas(), 100);
+        }
+      },
+      error: (err) => console.error('Error cargando solicitudes:', err),
     });
   }
 

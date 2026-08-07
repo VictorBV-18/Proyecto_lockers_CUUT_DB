@@ -17,9 +17,12 @@ export class LoginService {
     private router: Router,
   ) {}
 
-  login(username: string): Observable<loginResponse> {
+  login(username: string, password: string): Observable<loginResponse> {
     return this.http
-      .post<loginResponse>(`${this.API_URL}/login?numero_cuenta=${username}`, {})
+      .post<loginResponse>(`${this.API_URL}/login/`, {
+        numero_cuenta: username,
+        contrasena: password,
+      })
       .pipe(
         tap((response) => {
           Swal.fire({
@@ -30,11 +33,11 @@ export class LoginService {
             timer: 1500,
           });
           this.router.navigate(['/home']);
-          const { rol } = response;
+          const { rol, datos_usuario } = response;
           localStorage.setItem('numeroCuenta', username);
           localStorage.setItem('rolUsuario', rol);
-          if (response.id_admin) {
-            localStorage.setItem('idAdmin', String(response.id_admin));
+          if (datos_usuario) {
+            localStorage.setItem('idAdmin', String(datos_usuario.id));
           }
         }),
         catchError((error) => {

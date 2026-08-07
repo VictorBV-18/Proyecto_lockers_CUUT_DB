@@ -119,7 +119,7 @@ export class Solicitudes {
   }
 
   obtenerSolicitudes() {
-    this.peticionesPersonal.listarSolicitudes().subscribe();
+    this.peticionesPersonal.cargarTodasLasSolicitudes();
   }
 
   // ── Modal ─────────────────────────────────────────────────────

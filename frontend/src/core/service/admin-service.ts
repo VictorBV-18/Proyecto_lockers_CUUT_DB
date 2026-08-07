@@ -32,11 +32,13 @@ export class AdminService {
     tipo_tramite?: string;
     estado?: string;
     fecha?: string;
+    page?: number;
   }): Observable<SolicitudesResponse> {
     let params = new HttpParams();
     if (filtros?.tipo_tramite) params = params.set('tipo_tramite', filtros.tipo_tramite);
     if (filtros?.estado) params = params.set('estado', filtros.estado);
     if (filtros?.fecha) params = params.set('fecha', filtros.fecha);
+    params = params.set('page', filtros?.page ?? 1);
     return this.http.get<SolicitudesResponse>(`${this.API_URL}/solicitudes/`, { params });
   }
 

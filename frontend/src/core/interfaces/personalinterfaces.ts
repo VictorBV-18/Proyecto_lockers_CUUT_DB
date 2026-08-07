@@ -1,7 +1,11 @@
 export type EstadoSolicitud = 'EN_REVISION' | 'APROBADO' | 'RECHAZADO' | 'PENDIENTE';
 
 export interface Solicitudes {
-  solicitudes: Solicitud[]
+  pagina_actual: number
+  registros_por_pagina: number
+  total_registros: number
+  total_paginas: number
+  resultados: Solicitud[]
 }
 
 export interface Solicitud {

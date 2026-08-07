@@ -19,6 +19,7 @@ import { Notificaciones }   from './pages/notificaciones/notificaciones';
 import { AdminConfiguracion } from './pages/admin-configuracion/admin-configuracion';
 import { Auditoria }          from './pages/auditoria/auditoria';
 import { CrearCuentas }       from './pages/crear-cuentas/crear-cuentas';
+import { MiPerfil }           from './pages/mi-perfil/mi-perfil';
 
 const routes: Routes = [
   { path: '',      redirectTo: 'login', pathMatch: 'full' },
@@ -38,6 +39,7 @@ const routes: Routes = [
       { path: 'permisos-roles',  component: PermisosRoles  },
       { path: 'verificacion',    component: Verificacion   },
       { path: 'notificaciones',  component: Notificaciones },
+      { path: 'mi-perfil',       component: MiPerfil       },
       { path: 'configuracion',   component: AdminConfiguracion },
       { path: 'auditoria',       component: Auditoria      },
     ],

@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { environment } from '../../environment/environment';
@@ -24,15 +24,33 @@ export class PersonalService {
     private router: Router,
   ) {}
 
-  listarSolicitudes(): Observable<Solicitudes> {
-    return this.http.get<Solicitudes>(`${this.API_URL}/solicitudes`).pipe(
-      tap((response) => {
-        this.todasLasSolicitudes.set(response.solicitudes);
-      }),
+  // El backend regresa las solicitudes paginadas de 20 en 20.
+  listarSolicitudes(page: number = 1): Observable<Solicitudes> {
+    const params = new HttpParams().set('page', page);
+    return this.http.get<Solicitudes>(`${this.API_URL}/solicitudes/`, { params }).pipe(
       catchError((error) => {
-        return throwError(() => new Error('Error al editar la solicitud'));
+        return throwError(() => new Error('Error al obtener las solicitudes'));
       }),
     );
+  }
+
+  // Recorre todas las páginas del backend y acumula el resultado en el signal,
+  // para conservar el filtrado en cliente sobre la lista completa.
+  cargarTodasLasSolicitudes(): void {
+    this.obtenerPaginaDeSolicitudes(1, []);
+  }
+
+  private obtenerPaginaDeSolicitudes(page: number, acumulado: Solicitud[]): void {
+    this.listarSolicitudes(page).subscribe({
+      next: (response) => {
+        const combinado = [...acumulado, ...response.resultados];
+        this.todasLasSolicitudes.set(combinado);
+        if (page < response.total_paginas) {
+          this.obtenerPaginaDeSolicitudes(page + 1, combinado);
+        }
+      },
+      error: () => {},
+    });
   }
 
   //valida documento por documento
