@@ -44,9 +44,9 @@ export class LoginService {
           Swal.fire({
             position: 'center',
             icon: 'error',
-            title: `${error.detail}`,
+            title: error?.error?.detail || 'No se pudo iniciar sesión.',
             showConfirmButton: false,
-            timer: 1500,
+            timer: 2500,
           });
           return throwError(() => new Error('Error en el login'));
         }),

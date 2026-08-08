@@ -1,10 +1,13 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { PersonalService } from '../../../core/service/personal-service';
 import { AdminService } from '../../../core/service/admin-service';
-import { Solicitud, SolicitudDetalleRevisor } from '../../../core/interfaces/personalinterfaces';
+import { Solicitud, SolicitudDetalleRevisor, DocumentoRevisor } from '../../../core/interfaces/personalinterfaces';
 import { AceptarSolicitudResponse, LockerItem } from '../../../core/interfaces/admin-interfaces';
 import { claseEstado, formatearFecha } from '../../../helpers/helpers';
 import Swal from 'sweetalert2';
+
+const EXTENSIONES_IMAGEN = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 
 @Component({
   selector: 'app-solicitudes',
@@ -15,6 +18,7 @@ import Swal from 'sweetalert2';
 export class Solicitudes {
   peticionesPersonal = inject(PersonalService);
   private adminService = inject(AdminService);
+  private sanitizer = inject(DomSanitizer);
 
   idAdmin = Number(localStorage.getItem('idAdmin')) || 0;
 
@@ -65,6 +69,10 @@ export class Solicitudes {
 
   rechazandoDoc      = signal<Record<number, boolean>>({});
   procesandoDoc      = signal<Record<number, boolean>>({});
+
+  // Vista previa del documento subido por el alumno
+  docEnPreview       = signal<DocumentoRevisor | null>(null);
+  previewUrl         = signal<SafeResourceUrl | null>(null);
 
   accionSolicitud    = signal<'idle' | 'seleccionando-locker' | 'confirmando-estacionamiento' | 'rechazando'>('idle');
   lockersDisponibles = signal<LockerItem[]>([]);
@@ -153,6 +161,24 @@ export class Solicitudes {
     this.documentoGenerado.set(null);
     this.mesesVigencia = 4;
     this.resetAccionSolicitud();
+    this.cerrarPreviewDoc();
+  }
+
+  // ── Vista previa de documento ─────────────────────────────────
+  esImagenDoc(archivo: string): boolean {
+    const extension = archivo.split('.').pop()?.toLowerCase() ?? '';
+    return EXTENSIONES_IMAGEN.includes(extension);
+  }
+
+  abrirPreviewDoc(doc: DocumentoRevisor): void {
+    const url = this.peticionesPersonal.obtenerUrlDocumento(doc.id_documento);
+    this.previewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(url));
+    this.docEnPreview.set(doc);
+  }
+
+  cerrarPreviewDoc(): void {
+    this.docEnPreview.set(null);
+    this.previewUrl.set(null);
   }
 
   private resetAccionSolicitud(): void {

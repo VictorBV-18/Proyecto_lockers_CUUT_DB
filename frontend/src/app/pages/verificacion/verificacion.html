@@ -36,19 +36,23 @@
     <p class="result-title">{{ resultadoValido ? 'Acceso válido' : 'Acceso no válido' }}</p>
 
     <div class="result-datos" *ngIf="datosAlumno">
-      <div class="result-row"><span>Alumno</span><strong>{{ datosAlumno.nombre_completo }}</strong></div>
-      <div class="result-row"><span>No. Cuenta</span><strong>{{ datosAlumno.numero_cuenta }}</strong></div>
+      <div class="result-row"><span>Alumno</span><strong>{{ datosAlumno.alumno.nombre_completo }}</strong></div>
+      <div class="result-row"><span>No. Cuenta</span><strong>{{ datosAlumno.alumno.numero_cuenta }}</strong></div>
+      <div class="result-row"><span>Carrera</span><strong>{{ datosAlumno.alumno.carrera }}</strong></div>
       <div class="result-row"><span>Trámite</span><strong>{{ datosAlumno.tipo_tramite }}</strong></div>
-      <div class="result-row"><span>Vigencia</span><strong>{{ datosAlumno.vigencia }}</strong></div>
-      <div class="result-row" *ngIf="datosAlumno.recurso">
-        <span>Recurso</span><strong>{{ datosAlumno.recurso.codigo }} · {{ datosAlumno.recurso.ubicacion }}</strong>
+      <div class="result-row" *ngIf="datosAlumno.vehiculo">
+        <span>Vehículo</span>
+        <strong>{{ datosAlumno.vehiculo.placas }} · {{ datosAlumno.vehiculo.modelo }} ({{ datosAlumno.vehiculo.color }})</strong>
       </div>
-      <div class="result-row"><span>Estado</span><strong>{{ datosAlumno.estado }}</strong></div>
+      <div class="result-row"><span>Estado</span><strong>{{ datosAlumno.estado_acceso }}</strong></div>
     </div>
 
     <p class="scanner-error" *ngIf="mensajeError">{{ mensajeError }}</p>
 
-    <button class="btn btn--primary" (click)="escanearSiguiente()">Escanear siguiente</button>
+    <div class="result-actions">
+      <button class="btn btn--primary" (click)="escanearSiguiente()">Escanear siguiente</button>
+      <button class="btn btn--danger-outline" (click)="abrirModalReporte()">Reportar incidente</button>
+    </div>
   </div>
 
   <canvas #canvas class="hidden"></canvas>
@@ -87,6 +91,32 @@
           </tr>
         </tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Reportar Incidente -->
+<div class="modal-overlay" *ngIf="mostrarModalReporte" (click)="cerrarModalReporte()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">Reportar incidente</h3>
+      <button class="modal-close" (click)="cerrarModalReporte()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-text" *ngIf="datosAlumno">
+        Alumno: <strong>{{ datosAlumno.alumno.nombre_completo }}</strong> ({{ datosAlumno.alumno.numero_cuenta }})
+      </p>
+      <label class="field-label">Descripción del incidente *</label>
+      <textarea
+        class="field-textarea"
+        [(ngModel)]="descripcionReporte"
+        rows="4"
+        placeholder="Ej: la identidad no coincide con el tarjetón, el vehículo es distinto al registrado, indicios de tarjetón compartido..."
+      ></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn--ghost" (click)="cerrarModalReporte()">Cancelar</button>
+      <button class="btn btn--danger" [disabled]="!descripcionReporte.trim()" (click)="enviarReporte()">Enviar reporte</button>
     </div>
   </div>
 </div>

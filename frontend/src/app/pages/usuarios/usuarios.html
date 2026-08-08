@@ -3,12 +3,29 @@
   <p class="page-desc">Consulta los usuarios del sistema y sus datos.</p>
 </div>
 
-<!-- Filtro -->
+<!-- Filtros -->
 <div class="filters-bar">
-  <select class="filter-input" [(ngModel)]="filtroRol" (change)="filtrarPorRol()">
+  <input
+    type="text"
+    class="filter-input filter-input--search"
+    placeholder="Buscar por número de cuenta o nombre..."
+    [(ngModel)]="filtroBusqueda"
+    (keyup.enter)="aplicarFiltros()"
+  />
+
+  <select class="filter-input" [(ngModel)]="filtroRol">
     <option value="">Todos los roles</option>
     <option *ngFor="let r of roles" [value]="r">{{ getRolTexto(r) }}</option>
   </select>
+
+  <select class="filter-input" [(ngModel)]="filtroEstado">
+    <option value="">Todos los estados</option>
+    <option value="activo">Activo</option>
+    <option value="inactivo">Inactivo</option>
+  </select>
+
+  <button type="button" class="btn-aplicar" (click)="aplicarFiltros()">Aplicar filtros</button>
+  <button type="button" class="btn-limpiar" (click)="limpiarFiltros()">Limpiar</button>
 </div>
 
 <!-- Tabla -->
@@ -17,27 +34,44 @@
     <table class="data-table">
       <thead>
         <tr>
-          <th>Nombre</th>
+          <th>Número de cuenta</th>
+          <th>Nombre completo</th>
           <th>Correo</th>
           <th>Rol</th>
           <th>Estado</th>
-          <th>Último Acceso</th>
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let u of usuariosFiltrados">
-          <td class="td-name">{{ u.nombre }}</td>
-          <td>{{ u.correo }}</td>
-          <td>{{ getRolTexto(u.rol) }}</td>
-          <td>
-            <span class="badge" [ngClass]="getEstadoClase(u.estado)">{{ u.estado }}</span>
-          </td>
-          <td class="td-date">{{ u.ultimoAcceso }}</td>
+        <tr *ngIf="cargando">
+          <td colspan="5" class="td-empty">Cargando usuarios…</td>
         </tr>
-        <tr *ngIf="usuariosFiltrados.length === 0">
-          <td colspan="5" class="td-empty">No se encontraron usuarios.</td>
-        </tr>
+        <ng-container *ngIf="!cargando">
+          <tr *ngFor="let u of usuarios">
+            <td>{{ u.numero_cuenta }}</td>
+            <td class="td-name">{{ u.nombre_completo }}</td>
+            <td>{{ u.correo_electronico || '—' }}</td>
+            <td>{{ getRolTexto(u.rol) }}</td>
+            <td>
+              <span class="badge" [ngClass]="getEstadoClase(u.estado_activo)">
+                {{ u.estado_activo ? 'Activo' : 'Inactivo' }}
+              </span>
+            </td>
+          </tr>
+          <tr *ngIf="usuarios.length === 0">
+            <td colspan="5" class="td-empty">No se encontraron usuarios.</td>
+          </tr>
+        </ng-container>
       </tbody>
     </table>
+  </div>
+
+  <div class="pagination-bar" *ngIf="!cargando && totalRegistros > 0">
+    <span class="pagination-info">
+      Página {{ paginaActual }} de {{ totalPaginas }} · {{ totalRegistros }} usuarios
+    </span>
+    <div class="pagination-controls">
+      <button type="button" [disabled]="paginaActual <= 1" (click)="paginaAnterior()">Anterior</button>
+      <button type="button" [disabled]="paginaActual >= totalPaginas" (click)="paginaSiguiente()">Siguiente</button>
+    </div>
   </div>
 </div>

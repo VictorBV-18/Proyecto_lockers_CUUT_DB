@@ -257,18 +257,6 @@ export class NuevaSolicitud implements OnDestroy {
     return this.documentos.length > 0 && this.documentos.every((d) => d.archivo !== null);
   }
 
-  guardarBorrador(): void {
-    if (this.tipoSolicitud === '') {
-      alert('Selecciona primero un tipo de solicitud.');
-      return;
-    }
-    const payload = this.construirPayload(this.tipoSolicitud);
-    this.solicitudService.guardarBorrador(payload).subscribe({
-      next: () => alert('Borrador guardado.'),
-      error: () => alert('No se pudo guardar el borrador.'),
-    });
-  }
-
   enviarSolicitud(): void {
     if (!this.todosDocumentosListos() || this.enviando || this.idSolicitudActual === null) {
       if (!this.todosDocumentosListos()) {
@@ -326,8 +314,6 @@ export class NuevaSolicitud implements OnDestroy {
     const payload: NuevaSolicitudPayload = {
       numero_cuenta: localStorage.getItem('numeroCuenta') || '',
       tipo_tramite: tipo,
-      observacion: '',
-      correo_electronico: 'pepito@pepito.com',
     };
 
     if (tipo === 'estacionamiento') {

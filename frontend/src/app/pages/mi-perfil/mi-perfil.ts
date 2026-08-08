@@ -1,6 +1,6 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { SolicitudService } from '../../../core/service/solicitud-service';
-import { RecursoActivo } from '../../../core/interfaces/interfaces';
+import { PerfilAlumnoResponse, RecursoActivo } from '../../../core/interfaces/interfaces';
 
 @Component({
   selector: 'app-mi-perfil',
@@ -10,6 +10,9 @@ import { RecursoActivo } from '../../../core/interfaces/interfaces';
 })
 export class MiPerfil implements OnInit {
   numeroCuenta = localStorage.getItem('numeroCuenta') || '';
+
+  perfil: PerfilAlumnoResponse | null = null;
+  cargandoPerfil = true;
 
   vehiculo: RecursoActivo | null = null;
   cargandoVehiculo = true;
@@ -25,7 +28,22 @@ export class MiPerfil implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.cargarPerfil();
     this.cargarVehiculo();
+  }
+
+  private cargarPerfil(): void {
+    this.solicitudService.obtenerPerfilAlumno(this.numeroCuenta).subscribe({
+      next: (response) => {
+        this.perfil = response;
+        this.cargandoPerfil = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.cargandoPerfil = false;
+        this.cdr.detectChanges();
+      },
+    });
   }
 
   private cargarVehiculo(): void {
@@ -44,12 +62,20 @@ export class MiPerfil implements OnInit {
   }
 
   cambiarContrasena(): void {
-    if (!this.contrasenaActual || !this.contrasenaNueva || !this.confirmarContrasena) {
+    if (
+      !this.contrasenaActual.trim() ||
+      !this.contrasenaNueva.trim() ||
+      !this.confirmarContrasena.trim()
+    ) {
       this.solicitudService.peticionError('Completa todos los campos.');
       return;
     }
     if (this.contrasenaNueva !== this.confirmarContrasena) {
       this.solicitudService.peticionError('Las contraseñas nuevas no coinciden.');
+      return;
+    }
+    if (this.contrasenaNueva === this.contrasenaActual) {
+      this.solicitudService.peticionError('La nueva contraseña debe ser diferente a la actual.');
       return;
     }
 

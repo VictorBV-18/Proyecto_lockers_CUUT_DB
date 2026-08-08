@@ -1,5 +1,6 @@
-import { Component, OnInit } from '@angular/core';
-import { UsuarioMock } from '../../../core/interfaces/admin-interfaces';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { AdminService } from '../../../core/service/admin-service';
+import { UsuarioSistema } from '../../../core/interfaces/admin-interfaces';
 
 @Component({
   selector: 'app-usuarios',
@@ -8,33 +9,75 @@ import { UsuarioMock } from '../../../core/interfaces/admin-interfaces';
   styleUrl: './usuarios.css',
 })
 export class Usuarios implements OnInit {
-  usuarios: UsuarioMock[] = [];
-  usuariosFiltrados: UsuarioMock[] = [];
-  filtroRol = '';
+  usuarios: UsuarioSistema[] = [];
+  cargando = true;
 
-  roles = ['ADMIN', 'REVISOR', 'VIGILANTE'];
+  filtroBusqueda = '';
+  filtroRol = '';
+  filtroEstado = '';
+
+  paginaActual = 1;
+  totalPaginas = 1;
+  totalRegistros = 0;
+
+  roles = ['ALUMNO', 'ADMIN', 'REVISOR', 'VIGILANTE'];
+
+  constructor(
+    private adminService: AdminService,
+    private cdr: ChangeDetectorRef,
+  ) {}
 
   ngOnInit() {
-    this.usuarios = [
-      { id: 1, nombre: 'Administrador Propietario', correo: 'admin@cuut.mx', rol: 'ADMIN', estado: 'Activo', ultimoAcceso: '2026-06-24 14:30' },
-      { id: 2, nombre: 'Personal 1 Docente', correo: 'personal1@cuut.mx', rol: 'REVISOR', estado: 'Activo', ultimoAcceso: '2026-06-24 10:15' },
-      { id: 3, nombre: 'Guardia 1 Encargado', correo: 'guardia1@cuut.mx', rol: 'VIGILANTE', estado: 'Activo', ultimoAcceso: '2026-06-23 18:45' },
-      { id: 4, nombre: 'María López Hernández', correo: 'mlopez@cuut.mx', rol: 'REVISOR', estado: 'Inactivo', ultimoAcceso: '2026-06-20 09:00' },
-      { id: 5, nombre: 'Carlos Ramírez Torres', correo: 'cramirez@cuut.mx', rol: 'VIGILANTE', estado: 'Activo', ultimoAcceso: '2026-06-24 07:30' },
-    ];
-    this.usuariosFiltrados = [...this.usuarios];
+    this.cargarUsuarios(1);
   }
 
-  filtrarPorRol() {
-    if (this.filtroRol) {
-      this.usuariosFiltrados = this.usuarios.filter((u) => u.rol === this.filtroRol);
-    } else {
-      this.usuariosFiltrados = [...this.usuarios];
-    }
+  cargarUsuarios(page: number) {
+    this.cargando = true;
+    this.adminService
+      .listarUsuarios({
+        rol: this.filtroRol || undefined,
+        estado_activo: this.filtroEstado === '' ? undefined : this.filtroEstado === 'activo',
+        busqueda: this.filtroBusqueda.trim() || undefined,
+        page,
+      })
+      .subscribe({
+        next: (res) => {
+          this.usuarios = res.resultados;
+          this.paginaActual = res.pagina_actual;
+          this.totalPaginas = res.total_paginas;
+          this.totalRegistros = res.total_registros;
+          this.cargando = false;
+          this.cdr.detectChanges();
+        },
+        error: () => {
+          this.cargando = false;
+          this.cdr.detectChanges();
+        },
+      });
+  }
+
+  aplicarFiltros() {
+    this.cargarUsuarios(1);
+  }
+
+  limpiarFiltros() {
+    this.filtroBusqueda = '';
+    this.filtroRol = '';
+    this.filtroEstado = '';
+    this.cargarUsuarios(1);
+  }
+
+  paginaAnterior() {
+    if (this.paginaActual > 1) this.cargarUsuarios(this.paginaActual - 1);
+  }
+
+  paginaSiguiente() {
+    if (this.paginaActual < this.totalPaginas) this.cargarUsuarios(this.paginaActual + 1);
   }
 
   getRolTexto(rol: string): string {
     const mapa: Record<string, string> = {
+      ALUMNO: 'Alumno',
       ADMIN: 'Administrador',
       REVISOR: 'Personal Operativo',
       VIGILANTE: 'Guardia',
@@ -42,7 +85,7 @@ export class Usuarios implements OnInit {
     return mapa[rol] || rol;
   }
 
-  getEstadoClase(estado: string): string {
-    return estado === 'Activo' ? 'badge--success' : 'badge--muted';
+  getEstadoClase(activo: boolean): string {
+    return activo ? 'badge--success' : 'badge--muted';
   }
 }

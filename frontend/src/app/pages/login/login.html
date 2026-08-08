@@ -90,7 +90,7 @@
         </div>
       </div>
 
-      <a href="#" class="forgot">Olvidé mi contraseña</a>
+      <a class="forgot" role="button" tabindex="0" (click)="olvidoContrasena()">Olvidé mi contraseña</a>
 
       <button type="submit" class="btn-login">
         <span>Iniciar Sesión</span>
@@ -108,7 +108,7 @@
         <span class="ssl__avatar" aria-hidden="true"></span>
         <div class="ssl__text">
           <p class="ssl__title">Acceso Seguro SSL</p>
-          <p class="ssl__copy">© 2024 Universidad Global</p>
+          <p class="ssl__copy">© {{ anioActual }} UAEMex Tianguistenco</p>
         </div>
       </div>
     </footer>

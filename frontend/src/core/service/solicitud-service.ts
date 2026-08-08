@@ -1,7 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, of, throwError } from 'rxjs';
-import { catchError, delay, tap } from 'rxjs/operators';
+import { Observable, throwError } from 'rxjs';
+import { catchError, tap } from 'rxjs/operators';
 import {
   CambiarContrasenaPayload,
   CambiarContrasenaResponse,
@@ -11,6 +11,7 @@ import {
   NuevaSolcitudResponse,
   NuevaSolicitudPayload,
   NuevaSolicitudResponse,
+  PerfilAlumnoResponse,
   SolicitudesDetalladasResponse,
   SolicitudesEstudiante,
   SolicitudResumen,
@@ -104,10 +105,6 @@ export class SolicitudService {
     );
   }
 
-  guardarBorrador(payload: NuevaSolicitudPayload): Observable<{ ok: true }> {
-    return of({ ok: true as const }).pipe(delay(250));
-  }
-
   listarMisSolicitudes(numeroCuenta: string): Observable<MiSolicitudResponse> {
     return this.http.get<MiSolicitudResponse>(`${this.API_URL}/solicitudes/${numeroCuenta}/general`).pipe(
       tap((response) => {
@@ -142,6 +139,17 @@ export class SolicitudService {
         catchError(({ error }) => {
           this.peticionError(error?.detail ?? 'Error al obtener los datos del vehículo');
           return throwError(() => new Error('Error al obtener los datos del vehículo'));
+        }),
+      );
+  }
+
+  obtenerPerfilAlumno(numeroCuenta: string): Observable<PerfilAlumnoResponse> {
+    return this.http
+      .get<PerfilAlumnoResponse>(`${this.API_URL}/alumno/${numeroCuenta}/mi-perfil`)
+      .pipe(
+        catchError(({ error }) => {
+          this.peticionError(error?.detail ?? 'Error al obtener los datos del perfil');
+          return throwError(() => new Error('Error al obtener los datos del perfil'));
         }),
       );
   }

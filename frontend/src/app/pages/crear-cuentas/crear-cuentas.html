@@ -1,6 +1,6 @@
 <div class="page-header">
   <h1 class="page-title">Crear Cuentas</h1>
-  <p class="page-desc">Registra nuevas cuentas de administrador, docente, alumno o guardia.</p>
+  <p class="page-desc">Registra nuevas cuentas de administrador, personal operativo, alumno o guardia.</p>
 </div>
 
 <div class="config-card">
@@ -24,8 +24,6 @@
   <h3 class="card-title">Datos de la cuenta</h3>
   <p class="card-desc">Los campos marcados con * son obligatorios.</p>
 
-  <div *ngIf="mensajeExito" class="alert-success">{{ mensajeExito }}</div>
-
   <div class="form-grid">
     <div class="form-field">
       <label class="field-label">Número de cuenta *</label>
@@ -43,7 +41,7 @@
     </div>
 
     <div class="form-field">
-      <label class="field-label">Correo electrónico *</label>
+      <label class="field-label">Correo electrónico {{ correoRequerido() ? '*' : '(opcional)' }}</label>
       <input
         type="email"
         class="field-input"
@@ -56,9 +54,7 @@
       <label class="field-label">Carrera *</label>
       <select name="miLista" id="opciones" class="field-input" [(ngModel)]="carrera">
         <option value="" disabled selected>Selecciona una carrera</option>
-        <option value="ISW">Ingenieria en Software</option>
-        <option value="ICO" >Ingenieria en Computación</option>
-        <option value="IPI">Ingenieria en Procesos Industriales</option>
+        <option *ngFor="let c of carreras" [value]="c">{{ c }}</option>
       </select>
     </div>
 
@@ -117,7 +113,7 @@
     </div>
   </div>
 
-  <button type="button" class="btn btn--primary btn--mt" (click)="crearCuenta()">
-    Crear cuenta de {{ getTipoLabel(tipoCuenta) | lowercase }}
+  <button type="button" class="btn btn--primary btn--mt" [disabled]="enviando" (click)="crearCuenta()">
+    {{ enviando ? 'Creando...' : 'Crear cuenta de ' + (getTipoLabel(tipoCuenta) | lowercase) }}
   </button>
 </div>
