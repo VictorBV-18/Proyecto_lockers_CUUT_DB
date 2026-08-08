@@ -6,6 +6,7 @@ interface MenuItem {
   label: string;
   route: string;
   icon: string;
+  disabled?: boolean;
 }
 
 const ROLE_MENUS: Record<string, MenuItem[]> = {
@@ -17,7 +18,6 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
   ],
   revisor: [
     { label: 'Solicitudes',       route: '/home/solicitudes',     icon: 'inbox'         },
-    { label: 'Recursos',          route: '/home/recursos',        icon: 'package'       },
     { label: 'Reposiciones',      route: '/home/reposiciones',    icon: 'refresh'       },
     { label: 'Notificaciones',    route: '/home/notificaciones',  icon: 'bell'          },
   ],
@@ -28,8 +28,8 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: 'Usuarios',          route: '/home/usuarios',        icon: 'users'         },
     { label: 'Crear Cuentas',     route: '/home/crear-cuentas',   icon: 'user-plus'     },
     { label: 'Permisos y Roles',  route: '/home/permisos-roles',  icon: 'shield'        },
-    { label: 'Configuración',     route: '/home/configuracion',   icon: 'settings'      },
-    { label: 'Auditoría',         route: '/home/auditoria',       icon: 'clipboard'     },
+    { label: 'Configuración',     route: '/home/configuracion',   icon: 'settings',   disabled: true },
+    { label: 'Auditoría',         route: '/home/auditoria',       icon: 'clipboard',  disabled: true },
   ],
   vigilante: [
     { label: 'Verificar Accesos', route: '/home/verificacion',    icon: 'check-circle'  },
@@ -87,8 +87,9 @@ export class Layout implements OnInit {
     return this.currentRoute.startsWith(route);
   }
 
-  navigate(route: string) {
-    this.router.navigate([route]);
+  navigate(item: MenuItem) {
+    if (item.disabled) return;
+    this.router.navigate([item.route]);
   }
 
   logout() {

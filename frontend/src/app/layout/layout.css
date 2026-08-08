@@ -156,6 +156,14 @@
   box-shadow: 0 4px 14px rgba(0,0,0,0.28);
 }
 
+.nav-item--disabled,
+.nav-item--disabled:hover {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: none;
+  color: rgba(255,255,255,0.58);
+}
+
 .nav-icon {
   width: 18px;
   height: 18px;

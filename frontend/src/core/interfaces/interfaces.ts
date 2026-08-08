@@ -25,8 +25,6 @@ export interface loginResponse{
 export interface NuevaSolicitudPayload {
   numero_cuenta: string;
   tipo_tramite:  TipoSolicitudApi;
-  observacion: string | null
-  correo_electronico: string
   placas?: string
   modelo?: string
   color?: string
@@ -165,4 +163,13 @@ export interface CambiarContrasenaPayload {
 
 export interface CambiarContrasenaResponse {
   mensaje: string;
+}
+
+export interface PerfilAlumnoResponse {
+  numero_cuenta: string;
+  'nombre (s)': string;
+  apellidos: string;
+  carrera: string;
+  correo_electronico: string;
+  estado_activo: boolean;
 }

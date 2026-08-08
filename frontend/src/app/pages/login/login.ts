@@ -15,6 +15,7 @@ export class Login {
   numeroCuenta = '';
   password = '';
   mostrarPassword = false;
+  anioActual = new Date().getFullYear();
 
   constructor(private router: Router) {}
 
@@ -33,5 +34,13 @@ export class Login {
   }
   togglePassword() {
     this.mostrarPassword = !this.mostrarPassword;
+  }
+
+  olvidoContrasena() {
+    Swal.fire({
+      icon: 'info',
+      title: 'Recuperar contraseña',
+      text: 'Contacta al administrador del sistema para restablecer tu contraseña.',
+    });
   }
 }

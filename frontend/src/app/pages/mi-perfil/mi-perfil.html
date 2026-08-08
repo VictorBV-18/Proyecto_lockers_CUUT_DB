@@ -1,7 +1,37 @@
 <div class="page-header">
   <h1 class="page-title">Mi Perfil</h1>
-  <p class="page-desc">Consulta los datos de tu vehículo y actualiza tu contraseña.</p>
+  <p class="page-desc">Consulta tus datos personales, los de tu vehículo y actualiza tu contraseña.</p>
 </div>
+
+@if (perfil) {
+  <div class="config-card">
+    <h3 class="card-title">Datos Personales</h3>
+    <p class="card-desc">Información registrada en tu cuenta.</p>
+
+    <div class="form-grid">
+      <div class="form-field">
+        <label class="field-label">Número de cuenta</label>
+        <input type="text" class="field-input" [value]="perfil.numero_cuenta" readonly />
+      </div>
+      <div class="form-field">
+        <label class="field-label">Nombre(s)</label>
+        <input type="text" class="field-input" [value]="perfil['nombre (s)']" readonly />
+      </div>
+      <div class="form-field">
+        <label class="field-label">Apellidos</label>
+        <input type="text" class="field-input" [value]="perfil.apellidos" readonly />
+      </div>
+      <div class="form-field">
+        <label class="field-label">Carrera</label>
+        <input type="text" class="field-input" [value]="perfil.carrera" readonly />
+      </div>
+      <div class="form-field">
+        <label class="field-label">Correo electrónico</label>
+        <input type="text" class="field-input" [value]="perfil.correo_electronico" readonly />
+      </div>
+    </div>
+  </div>
+}
 
 @if (vehiculo) {
   <div class="config-card">

@@ -78,6 +78,12 @@ export class PersonalService {
       );
   }
 
+  // Devuelve la URL para previsualizar (inline) el documento subido por el alumno.
+  // El propio <img>/<iframe> hace el GET directamente, no pasa por HttpClient.
+  obtenerUrlDocumento(idDocumento: number): string {
+    return `${this.API_URL}/solicitudes/documentos/${idDocumento}/visualizar`;
+  }
+
   obtenerDetalleSolicitud(idSolicitud: number): Observable<SolicitudDetalleRevisor> {
     return this.http
       .get<SolicitudDetalleRevisor>(`${this.API_URL}/solicitudes/${idSolicitud}/detalle`)

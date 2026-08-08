@@ -1,21 +1,18 @@
 // Interfaces para el panel de administrador
 
-export interface SolicitudAdmin {
-  id_solicitud: number;
-  folio: string;
-  numero_cuenta: string;
-  nombre_completo: string;
-  tipo_tramite: string;
-  fecha_solicitud: string;
-  estado: string;
-}
-
-export interface SolicitudesResponse {
-  pagina_actual: number;
-  registros_por_pagina: number;
-  total_registros: number;
-  total_paginas: number;
-  resultados: SolicitudAdmin[];
+export interface EstadisticasDashboardResponse {
+  solicitudes: {
+    total: number;
+    pendientes: number;
+    aprobadas: number;
+    rechazadas: number;
+  };
+  lockers: {
+    total: number;
+    disponibles: number;
+    ocupados: number;
+    mantenimiento: number;
+  };
 }
 
 export interface InventarioLockersResponse {
@@ -56,6 +53,17 @@ export interface BajaLockerPayload {
   motivo: string;
 }
 
+export interface LiberacionMasivaPayload {
+  id_admin: number;
+  motivo?: string;
+}
+
+export interface LiberacionMasivaResponse {
+  mensaje: string;
+  lockers_liberados: number;
+  motivo: string;
+}
+
 export interface EvaluarDocumentoPayload {
   id_admin: number;
   estado: 'APROBADO' | 'RECHAZADO';
@@ -90,15 +98,34 @@ export interface AceptarSolicitudResponse {
   archivo: string;
 }
 
-// Interfaces para datos mock
-export interface UsuarioMock {
-  id: number;
-  nombre: string;
-  correo: string;
+export interface UsuarioSistema {
+  id_usuario: number;
+  numero_cuenta: string;
+  nombre_completo: string;
+  correo_electronico: string | null;
+  estado_activo: boolean;
   rol: string;
-  estado: string;
-  ultimoAcceso: string;
 }
+
+export interface UsuariosListResponse {
+  pagina_actual: number;
+  registros_por_pagina: number;
+  total_registros: number;
+  total_paginas: number;
+  resultados: UsuarioSistema[];
+}
+
+export interface CambioEstadoPayload {
+  numero_cuenta: string;
+  estado_activo: boolean;
+}
+
+export interface CambioRolPayload {
+  numero_cuenta: string;
+  nuevo_rol: string;
+}
+
+// Interfaces para datos mock
 
 export interface AuditoriaMock {
   id: number;
@@ -115,5 +142,33 @@ export interface RequisitoMock {
   tramiteAsociado: string;
 }
 
-// Interfaces para la creación de cuentas (diseño front, aún sin conectar al backend)
-export type TipoCuentaNueva = 'ADMIN' | 'DOCENTE' | 'ALUMNO' | 'GUARDIA';
+// Interfaces para la creación de cuentas
+export type TipoCuentaNueva = 'ADMIN' | 'REVISOR' | 'ALUMNO' | 'VIGILANTE';
+
+export const CARRERAS_VALIDAS = [
+  'Licenciatura en Ingeniería en Computación',
+  'Licenciatura en Ingeniería en Software',
+  'Licenciatura en Ingeniería en Producción Industrial',
+  'Licenciatura en Ingeniería en Mecánica',
+  'Licenciatura en Seguridad Ciudadana',
+  'Licenciatura en Ingeniería en Ciberseguridad',
+  'Licenciatura en Ingeniería en Plásticos',
+];
+
+export interface CrearAlumnoPayload {
+  numero_cuenta: string;
+  nombre: string;
+  apellidos: string;
+  correo_electronico: string;
+  contrasena: string;
+  carrera: string;
+}
+
+export interface CrearPersonalPayload {
+  numero_cuenta: string;
+  nombre: string;
+  apellidos: string;
+  contrasena: string;
+  rol: string;
+  correo_electronico?: string;
+}

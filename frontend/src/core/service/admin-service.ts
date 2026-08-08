@@ -3,7 +3,8 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environment/environment';
 import {
-  SolicitudesResponse,
+  EstadisticasDashboardResponse,
+  UsuariosListResponse,
   InventarioLockersResponse,
   LockersListResponse,
   CrearLockerPayload,
@@ -15,6 +16,12 @@ import {
   AprobarEstacionamientoPayload,
   AceptarSolicitudPayload,
   AceptarSolicitudResponse,
+  CrearAlumnoPayload,
+  CrearPersonalPayload,
+  CambioEstadoPayload,
+  CambioRolPayload,
+  LiberacionMasivaPayload,
+  LiberacionMasivaResponse,
 
 } from '../interfaces/admin-interfaces';
 
@@ -27,20 +34,6 @@ export class AdminService {
   constructor(private http: HttpClient) {}
 
   // ── Solicitudes ──────────────────────────────
-
-  obtenerTodasSolicitudes(filtros?: {
-    tipo_tramite?: string;
-    estado?: string;
-    fecha?: string;
-    page?: number;
-  }): Observable<SolicitudesResponse> {
-    let params = new HttpParams();
-    if (filtros?.tipo_tramite) params = params.set('tipo_tramite', filtros.tipo_tramite);
-    if (filtros?.estado) params = params.set('estado', filtros.estado);
-    if (filtros?.fecha) params = params.set('fecha', filtros.fecha);
-    params = params.set('page', filtros?.page ?? 1);
-    return this.http.get<SolicitudesResponse>(`${this.API_URL}/solicitudes/`, { params });
-  }
 
   evaluarDocumento(
     idSolicitud: number,
@@ -58,6 +51,44 @@ export class AdminService {
     datos: RechazarSolicitudPayload
   ): Observable<any> {
     return this.http.post(`${this.API_URL}/solicitudes/${idSolicitud}/rechazar`, datos);
+  }
+
+  // ── Dashboard ──────────────────────────────────
+
+  obtenerEstadisticasDashboard(): Observable<EstadisticasDashboardResponse> {
+    return this.http.get<EstadisticasDashboardResponse>(`${this.API_URL}/admin/estadisticas/dashboard`);
+  }
+
+  // ── Usuarios ───────────────────────────────────
+
+  listarUsuarios(filtros?: {
+    rol?: string;
+    estado_activo?: boolean;
+    busqueda?: string;
+    page?: number;
+  }): Observable<UsuariosListResponse> {
+    let params = new HttpParams();
+    if (filtros?.rol) params = params.set('rol', filtros.rol);
+    if (filtros?.estado_activo !== undefined) params = params.set('estado_activo', filtros.estado_activo);
+    if (filtros?.busqueda) params = params.set('busqueda', filtros.busqueda);
+    params = params.set('page', filtros?.page ?? 1);
+    return this.http.get<UsuariosListResponse>(`${this.API_URL}/admin/usuarios`, { params });
+  }
+
+  crearCuentaAlumno(datos: CrearAlumnoPayload): Observable<any> {
+    return this.http.post(`${this.API_URL}/admin/usuarios/alumno`, datos);
+  }
+
+  crearCuentaPersonal(datos: CrearPersonalPayload): Observable<any> {
+    return this.http.post(`${this.API_URL}/admin/usuarios/personal`, datos);
+  }
+
+  cambiarEstadoUsuario(datos: CambioEstadoPayload): Observable<any> {
+    return this.http.put(`${this.API_URL}/admin/usuarios/estado`, datos);
+  }
+
+  cambiarRolUsuario(datos: CambioRolPayload): Observable<any> {
+    return this.http.put(`${this.API_URL}/admin/usuarios/rol`, datos);
   }
 
   // ── Inventario ───────────────────────────────
@@ -80,6 +111,10 @@ export class AdminService {
 
   darBajaLocker(idLocker: number, datos: BajaLockerPayload): Observable<any> {
     return this.http.patch(`${this.API_URL}/admin/lockers/${idLocker}/baja`, datos);
+  }
+
+  liberacionMasivaLockers(datos: LiberacionMasivaPayload): Observable<LiberacionMasivaResponse> {
+    return this.http.post<LiberacionMasivaResponse>(`${this.API_URL}/admin/inventario/liberacion-masiva`, datos);
   }
 
   // ── Aprobaciones ─────────────────────────────

@@ -1,5 +1,6 @@
-import { Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
 import jsQR from 'jsqr';
+import Swal from 'sweetalert2';
 import { GuardiaService } from '../../../core/service/guardia-service';
 import {
   HistorialVerificacionItem,
@@ -27,13 +28,21 @@ export class Verificacion implements OnDestroy {
 
   historialTurno: HistorialVerificacionItem[] = [];
 
+  mostrarModalReporte = false;
+  descripcionReporte = '';
+
   private stream: MediaStream | null = null;
   private frameId = 0;
   private ultimoTokenLeido = '';
 
-  constructor(private guardiaService: GuardiaService) {}
+  constructor(
+    private guardiaService: GuardiaService,
+    private cdr: ChangeDetectorRef,
+  ) {}
 
   async iniciarEscaneo() {
+    if (this.estado !== 'idle') return;
+
     this.errorCamara = '';
     this.mensajeError = '';
     this.datosAlumno = null;
@@ -45,10 +54,12 @@ export class Verificacion implements OnDestroy {
       });
     } catch {
       this.errorCamara = 'No se pudo acceder a la cámara. Revisa los permisos del navegador.';
+      this.cdr.detectChanges();
       return;
     }
 
     this.estado = 'escaneando';
+    this.cdr.detectChanges();
     const video = this.videoRef.nativeElement;
     video.srcObject = this.stream;
     await video.play();
@@ -96,6 +107,7 @@ export class Verificacion implements OnDestroy {
   private procesarQr(valorQr: string) {
     this.detenerCamara();
     this.estado = 'procesando';
+    this.cdr.detectChanges();
     const token = this.extraerToken(valorQr);
 
     this.guardiaService.verificarQr(token).subscribe({
@@ -106,17 +118,18 @@ export class Verificacion implements OnDestroy {
 
   private mostrarResultado(respuesta: VerificacionQrResponse) {
     this.datosAlumno = respuesta;
-    this.resultadoValido = respuesta.valido && respuesta.estado === 'VIGENTE';
+    this.resultadoValido = respuesta.estado_acceso === 'VIGENTE';
     this.estado = 'resultado';
 
     this.historialTurno.unshift({
       hora: this.horaActual(),
-      nombre_completo: respuesta.nombre_completo,
-      numero_cuenta: respuesta.numero_cuenta,
+      nombre_completo: respuesta.alumno.nombre_completo,
+      numero_cuenta: respuesta.alumno.numero_cuenta,
       tipo_tramite: respuesta.tipo_tramite,
       resultado: this.resultadoValido ? 'VALIDO' : 'INVALIDO',
-      detalle: respuesta.estado,
+      detalle: respuesta.estado_acceso,
     });
+    this.cdr.detectChanges();
   }
 
   private mostrarError(mensaje: string) {
@@ -132,6 +145,28 @@ export class Verificacion implements OnDestroy {
       tipo_tramite: '—',
       resultado: 'INVALIDO',
       detalle: mensaje,
+    });
+    this.cdr.detectChanges();
+  }
+
+  abrirModalReporte() {
+    this.descripcionReporte = '';
+    this.mostrarModalReporte = true;
+  }
+
+  cerrarModalReporte() {
+    this.mostrarModalReporte = false;
+  }
+
+  enviarReporte() {
+    if (!this.descripcionReporte.trim()) return;
+    this.cerrarModalReporte();
+    Swal.fire({
+      icon: 'info',
+      title: 'Reporte de incidentes no disponible aún',
+      text: 'Esta función estará activa cuando se implemente el endpoint correspondiente en el backend.',
+      timer: 3500,
+      showConfirmButton: false,
     });
   }
 

@@ -3,11 +3,32 @@
   <p class="page-desc">Gestiona los permisos de acceso y roles de los usuarios.</p>
 </div>
 
+<!-- Filtros -->
+<div class="filters-bar">
+  <input
+    type="text"
+    class="filter-input filter-input--search"
+    placeholder="Buscar por número de cuenta o nombre..."
+    [(ngModel)]="filtroBusqueda"
+    (keyup.enter)="aplicarFiltros()"
+  />
+
+  <select class="filter-input" [(ngModel)]="filtroRol">
+    <option value="">Todos los roles</option>
+    <option value="ALUMNO">Alumno</option>
+    <option *ngFor="let r of roles" [value]="r">{{ getRolTexto(r) }}</option>
+  </select>
+
+  <button type="button" class="btn-aplicar" (click)="aplicarFiltros()">Aplicar filtros</button>
+  <button type="button" class="btn-limpiar" (click)="limpiarFiltros()">Limpiar</button>
+</div>
+
 <div class="table-card">
   <div class="table-wrapper">
     <table class="data-table">
       <thead>
         <tr>
+          <th>Número de cuenta</th>
           <th>Nombre</th>
           <th>Correo</th>
           <th>Rol</th>
@@ -16,21 +37,40 @@
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let u of usuarios">
-          <td class="td-name">{{ u.nombre }}</td>
-          <td>{{ u.correo }}</td>
-          <td>{{ getRolTexto(u.rol) }}</td>
-          <td>
-            <span class="badge" [ngClass]="u.habilitado ? 'badge--success' : 'badge--muted'">
-              {{ u.habilitado ? 'Habilitado' : 'Deshabilitado' }}
-            </span>
-          </td>
-          <td>
-            <button class="btn btn--sm btn--outline" (click)="abrirModal(u)">Editar</button>
-          </td>
+        <tr *ngIf="cargando">
+          <td colspan="6" class="td-empty">Cargando usuarios…</td>
         </tr>
+        <ng-container *ngIf="!cargando">
+          <tr *ngFor="let u of usuarios">
+            <td>{{ u.numero_cuenta }}</td>
+            <td class="td-name">{{ u.nombre_completo }}</td>
+            <td>{{ u.correo_electronico || '—' }}</td>
+            <td>{{ getRolTexto(u.rol) }}</td>
+            <td>
+              <span class="badge" [ngClass]="u.estado_activo ? 'badge--success' : 'badge--muted'">
+                {{ u.estado_activo ? 'Habilitado' : 'Deshabilitado' }}
+              </span>
+            </td>
+            <td>
+              <button class="btn btn--sm btn--outline" (click)="abrirModal(u)">Editar</button>
+            </td>
+          </tr>
+          <tr *ngIf="usuarios.length === 0">
+            <td colspan="6" class="td-empty">No se encontraron usuarios.</td>
+          </tr>
+        </ng-container>
       </tbody>
     </table>
+  </div>
+
+  <div class="pagination-bar" *ngIf="!cargando && totalRegistros > 0">
+    <span class="pagination-info">
+      Página {{ paginaActual }} de {{ totalPaginas }} · {{ totalRegistros }} usuarios
+    </span>
+    <div class="pagination-controls">
+      <button type="button" [disabled]="paginaActual <= 1" (click)="paginaAnterior()">Anterior</button>
+      <button type="button" [disabled]="paginaActual >= totalPaginas" (click)="paginaSiguiente()">Siguiente</button>
+    </div>
   </div>
 </div>
 
@@ -43,13 +83,18 @@
     </div>
     <div class="modal-body">
       <p class="modal-text">
-        Editando a <strong>{{ usuarioSeleccionado?.nombre }}</strong>
+        Editando a <strong>{{ usuarioSeleccionado?.nombre_completo }}</strong>
       </p>
 
-      <label class="field-label">Rol</label>
-      <select class="field-input" [(ngModel)]="nuevoRol">
-        <option *ngFor="let r of roles" [value]="r">{{ getRolTexto(r) }}</option>
-      </select>
+      <ng-container *ngIf="usuarioSeleccionado && puedeEditarRol(usuarioSeleccionado); else sinCambioRol">
+        <label class="field-label">Rol</label>
+        <select class="field-input" [(ngModel)]="nuevoRol">
+          <option *ngFor="let r of roles" [value]="r">{{ getRolTexto(r) }}</option>
+        </select>
+      </ng-container>
+      <ng-template #sinCambioRol>
+        <p class="modal-text">Los alumnos no pueden cambiar de rol.</p>
+      </ng-template>
 
       <div class="toggle-group">
         <label class="field-label">Cuenta habilitada</label>
@@ -60,8 +105,10 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn--ghost" (click)="cerrarModal()">Cancelar</button>
-      <button class="btn btn--primary" (click)="guardarCambios()">Guardar Cambios</button>
+      <button class="btn btn--ghost" [disabled]="guardando" (click)="cerrarModal()">Cancelar</button>
+      <button class="btn btn--primary" [disabled]="guardando" (click)="guardarCambios()">
+        {{ guardando ? 'Guardando...' : 'Guardar Cambios' }}
+      </button>
     </div>
   </div>
 </div>
