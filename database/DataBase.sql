@@ -142,7 +142,7 @@ CREATE TABLE auditoria_acceso (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_solicitud_activa_locker ON solicitud (id_alumno, tipo_tramite) 
-WHERE tipo_tramite = 'locker' AND estado IN ('PENDIENTE', 'EN_REVISION', 'APROBADA', 'DOCUMENTACION_INCORRECTA', 'REPOSICION');
+WHERE tipo_tramite = 'locker' AND estado IN ('DATOS_INCOMPLETOS', 'PENDIENTE', 'EN_REVISION', 'APROBADA', 'DOCUMENTACION_INCORRECTA', 'REPOSICION');
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_asignacion_activa_por_locker ON asignacion (id_locker) WHERE estado = 'ACTIVA' AND id_locker IS NOT NULL;
 

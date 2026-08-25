@@ -47,17 +47,17 @@ def crear_solicitud(solicitud: SolicitudCrear):
         if tramite == 'locker':
             cursor.execute("""
                 SELECT id_solicitud FROM solicitud 
-                WHERE id_alumno = %s AND tipo_tramite = 'locker' AND estado IN ('PENDIENTE', 'EN_REVISION', 'APROBADA', 'DOCUMENTACION_INCORRECTA', 'REPOSICION')
+                WHERE id_alumno = %s AND tipo_tramite = 'locker' AND estado IN ('DATOS_INCOMPLETOS', 'PENDIENTE', 'EN_REVISION', 'APROBADA', 'DOCUMENTACION_INCORRECTA', 'REPOSICION')
             """, (id_alumno_real,))
             if cursor.fetchone():
                 cursor.close()
                 conexion.close()
-                raise HTTPException(status_code=400, detail="Ya tienes una solicitud de locker en proceso o activa.")
+                raise HTTPException(status_code=400, detail="Ya tienes una solicitud de locker en proceso o activa. Termina tu solicitud anterior.")
         
         elif tramite == 'estacionamiento':
             cursor.execute("""
                 SELECT COUNT(*) FROM solicitud 
-                WHERE id_alumno = %s AND tipo_tramite = 'estacionamiento' AND estado IN ('PENDIENTE', 'EN_REVISION', 'APROBADA', 'DOCUMENTACION_INCORRECTA', 'REPOSICION')
+                WHERE id_alumno = %s AND tipo_tramite = 'estacionamiento' AND estado IN ('DATOS_INCOMPLETOS', 'PENDIENTE', 'EN_REVISION', 'APROBADA', 'DOCUMENTACION_INCORRECTA', 'REPOSICION')
             """, (id_alumno_real,))
             conteo_estacionamientos = cursor.fetchone()[0]
             if conteo_estacionamientos >= 3:
