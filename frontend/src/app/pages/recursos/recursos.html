@@ -73,8 +73,13 @@
           </td>
           <td class="td-actions">
             <button class="btn btn--sm btn--ghost" (click)="abrirModalEditar(l)">Editar</button>
-            <button class="btn btn--sm btn--outline-warning" (click)="abrirModalBaja(l, 'Mantenimiento')" [disabled]="l.estado === 'OCUPADO'">Mantenimiento</button>
-            <button class="btn btn--sm btn--outline-danger" (click)="abrirModalBaja(l, 'Dar de Baja')" [disabled]="l.estado === 'OCUPADO'">Dar de Baja</button>
+            <ng-container *ngIf="l.estado === 'MANTENIMIENTO'; else accionesBaja">
+              <button class="btn btn--sm btn--outline-success" (click)="confirmarAlta(l)">Reactivar</button>
+            </ng-container>
+            <ng-template #accionesBaja>
+              <button class="btn btn--sm btn--outline-warning" (click)="abrirModalBaja(l, 'Mantenimiento')" [disabled]="l.estado === 'OCUPADO'">Mantenimiento</button>
+              <button class="btn btn--sm btn--outline-danger" (click)="abrirModalBaja(l, 'Dar de Baja')" [disabled]="l.estado === 'OCUPADO'">Dar de Baja</button>
+            </ng-template>
           </td>
         </tr>
         <tr *ngIf="lockers.length === 0">

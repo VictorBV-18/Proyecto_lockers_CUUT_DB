@@ -2,8 +2,20 @@
 
   <!-- Encabezado -->
   <header class="notif-head">
-    <h1 class="notif-head__title">Centro de Notificaciones</h1>
-    <p class="notif-head__subtitle">Mantente al día con tus trámites y noticias académicas.</p>
+    <div>
+      <h1 class="notif-head__title">Centro de Notificaciones</h1>
+      <p class="notif-head__subtitle">Mantente al día con tus trámites y noticias académicas.</p>
+    </div>
+    @if (notificacionService.noLeidas() > 0) {
+      <button
+        type="button"
+        class="btn-marcar-todas"
+        [disabled]="marcandoTodas"
+        (click)="marcarTodasLeidas()"
+      >
+        {{ marcandoTodas ? 'Marcando…' : 'Marcar todas como leídas' }}
+      </button>
+    }
   </header>
 
   <!-- Cargando -->

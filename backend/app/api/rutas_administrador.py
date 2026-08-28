@@ -1413,9 +1413,8 @@ def consultar_evidencias_apelacion(numero_cuenta: str):
                 "folio": f[4],
                 "qr_token": str(f[5]),
                 "vigencia": f[6],
-                "estado_permiso": f[7], 
-                "motivo": f[8],
-                "evidencia": f[9]
+                "motivo": f[7],
+                "evidencia": f[8]
             })
 
         cursor.close()

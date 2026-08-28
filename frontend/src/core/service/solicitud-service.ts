@@ -5,16 +5,15 @@ import { catchError, tap } from 'rxjs/operators';
 import {
   CambiarContrasenaPayload,
   CambiarContrasenaResponse,
-  DetallesTramiteResponse,
   FinalizarSolicitudResponse,
   MiSolicitudResponse,
   NuevaSolcitudResponse,
   NuevaSolicitudPayload,
   NuevaSolicitudResponse,
   PerfilAlumnoResponse,
+  RecursoActivo,
   SolicitudesDetalladasResponse,
   SolicitudesEstudiante,
-  SolicitudResumen,
 } from '../interfaces/interfaces';
 import { environment } from '../../environment/environment';
 import Swal from 'sweetalert2';
@@ -48,7 +47,6 @@ export class SolicitudService {
 
   constructor(private http: HttpClient , private router:Router) {}
 
-  public misSolicitudes = signal<SolicitudResumen[]>([])
   public misTramites = signal<SolicitudesEstudiante[]>([])
 
   crearSolicitud(payload: NuevaSolicitudPayload): Observable<NuevaSolcitudResponse> {
@@ -95,16 +93,6 @@ export class SolicitudService {
       );
   }
 
-  editarSolicitud(): Observable<any> {
-    return this.http.put<any>(`${this.API_URL}/editar-solicitud`, {}).pipe(
-      tap(() => console.log('Solicitud editada exitosamente')),
-      catchError((error) => {
-        this.peticionError(error);
-        return throwError(() => new Error('Error al editar la solicitud'));
-      }),
-    );
-  }
-
   listarMisSolicitudes(numeroCuenta: string): Observable<MiSolicitudResponse> {
     return this.http.get<MiSolicitudResponse>(`${this.API_URL}/solicitudes/${numeroCuenta}/general`).pipe(
       tap((response) => {
@@ -119,10 +107,6 @@ export class SolicitudService {
   }
 
 
-  documentosSolicitados(numeroCuenta: string): Observable<any> {
-    return this.http.get<any>(`${this.API_URL}/documentos-solicitados/`);
-  }
-
   obtenerSolicitudesDetalladas(numeroCuenta: string): Observable<SolicitudesDetalladasResponse> {
     return this.http.get<SolicitudesDetalladasResponse>(`${this.API_URL}/solicitudes/${numeroCuenta}`).pipe(
       catchError(({ error }) => {
@@ -132,13 +116,13 @@ export class SolicitudService {
     );
   }
 
-  obtenerDetallesTramite(numeroCuenta: string): Observable<DetallesTramiteResponse> {
+  obtenerRecursoActivo(idSolicitud: number): Observable<RecursoActivo> {
     return this.http
-      .get<DetallesTramiteResponse>(`${this.API_URL}/alumno/${numeroCuenta}/detalles-tramite`)
+      .get<RecursoActivo>(`${this.API_URL}/solicitudes/${idSolicitud}/recurso-activo`)
       .pipe(
         catchError(({ error }) => {
-          this.peticionError(error?.detail ?? 'Error al obtener los datos del vehículo');
-          return throwError(() => new Error('Error al obtener los datos del vehículo'));
+          this.peticionError(error?.detail ?? 'Error al obtener los datos del recurso');
+          return throwError(() => new Error('Error al obtener los datos del recurso'));
         }),
       );
   }

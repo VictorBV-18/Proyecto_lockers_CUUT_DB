@@ -52,3 +52,8 @@ export interface SolicitudDetalleRevisor {
   fecha_solicitud: string;
   documentos: DocumentoRevisor[];
 }
+
+export interface EnRevisionResponse {
+  mensaje: string;
+  nuevo_estado?: string;
+}

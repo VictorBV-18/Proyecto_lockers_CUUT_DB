@@ -1,6 +1,6 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { SolicitudService } from '../../../core/service/solicitud-service';
-import { PerfilAlumnoResponse, RecursoActivo } from '../../../core/interfaces/interfaces';
+import { PerfilAlumnoResponse } from '../../../core/interfaces/interfaces';
 
 @Component({
   selector: 'app-mi-perfil',
@@ -14,9 +14,6 @@ export class MiPerfil implements OnInit {
   perfil: PerfilAlumnoResponse | null = null;
   cargandoPerfil = true;
 
-  vehiculo: RecursoActivo | null = null;
-  cargandoVehiculo = true;
-
   contrasenaActual = '';
   contrasenaNueva = '';
   confirmarContrasena = '';
@@ -29,7 +26,6 @@ export class MiPerfil implements OnInit {
 
   ngOnInit(): void {
     this.cargarPerfil();
-    this.cargarVehiculo();
   }
 
   private cargarPerfil(): void {
@@ -46,21 +42,6 @@ export class MiPerfil implements OnInit {
     });
   }
 
-  private cargarVehiculo(): void {
-    this.solicitudService.obtenerDetallesTramite(this.numeroCuenta).subscribe({
-      next: (response) => {
-        this.vehiculo =
-          response.recursos_activos.find((r) => r.tipo_tramite === 'estacionamiento') ?? null;
-        this.cargandoVehiculo = false;
-        this.cdr.detectChanges();
-      },
-      error: () => {
-        this.cargandoVehiculo = false;
-        this.cdr.detectChanges();
-      },
-    });
-  }
-
   cambiarContrasena(): void {
     if (
       !this.contrasenaActual.trim() ||
@@ -68,6 +49,10 @@ export class MiPerfil implements OnInit {
       !this.confirmarContrasena.trim()
     ) {
       this.solicitudService.peticionError('Completa todos los campos.');
+      return;
+    }
+    if (this.contrasenaNueva.length < 8) {
+      this.solicitudService.peticionError('La nueva contraseña debe tener al menos 8 caracteres.');
       return;
     }
     if (this.contrasenaNueva !== this.confirmarContrasena) {

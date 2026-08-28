@@ -7,7 +7,7 @@ import {
   VerificacionQrResponse,
 } from '../../../core/interfaces/guardia-interfaces';
 
-type EstadoEscaner = 'idle' | 'escaneando' | 'procesando' | 'resultado';
+type EstadoEscaner = 'idle' | 'escaneando' | 'procesando' | 'confirmando' | 'resultado';
 
 @Component({
   selector: 'app-verificacion',
@@ -19,17 +19,24 @@ export class Verificacion implements OnDestroy {
   @ViewChild('video') videoRef!: ElementRef<HTMLVideoElement>;
   @ViewChild('canvas') canvasRef!: ElementRef<HTMLCanvasElement>;
 
+  private idGuardia = Number(localStorage.getItem('idAdmin')) || 0;
+
   estado: EstadoEscaner = 'idle';
   errorCamara = '';
   mensajeError = '';
 
   resultadoValido = false;
+  mensajeResultado = '';
   datosAlumno: VerificacionQrResponse | null = null;
 
   historialTurno: HistorialVerificacionItem[] = [];
 
-  mostrarModalReporte = false;
-  descripcionReporte = '';
+  // ── Confirmación de identidad / vehículo (previa a registrar el acceso) ──
+  confirmacionIdentidad: boolean | null = null;
+  confirmacionVehiculo: boolean | null = null;
+  motivoDenegacion = '';
+  evidenciaArchivo: File | null = null;
+  registrando = false;
 
   private stream: MediaStream | null = null;
   private frameId = 0;
@@ -45,6 +52,7 @@ export class Verificacion implements OnDestroy {
 
     this.errorCamara = '';
     this.mensajeError = '';
+    this.mensajeResultado = '';
     this.datosAlumno = null;
     this.ultimoTokenLeido = '';
 
@@ -111,24 +119,37 @@ export class Verificacion implements OnDestroy {
     const token = this.extraerToken(valorQr);
 
     this.guardiaService.verificarQr(token).subscribe({
-      next: (respuesta) => this.mostrarResultado(respuesta),
+      next: (respuesta) => this.mostrarResultadoQr(respuesta),
       error: () => this.mostrarError('No se pudo verificar el código. Intenta de nuevo.'),
     });
   }
 
-  private mostrarResultado(respuesta: VerificacionQrResponse) {
+  // El QR solo dice si el permiso está vigente. Si lo está, falta que el guardia
+  // confirme físicamente identidad y vehículo antes de registrar el acceso.
+  private mostrarResultadoQr(respuesta: VerificacionQrResponse) {
     this.datosAlumno = respuesta;
-    this.resultadoValido = respuesta.estado_acceso === 'VIGENTE';
-    this.estado = 'resultado';
 
-    this.historialTurno.unshift({
-      hora: this.horaActual(),
-      nombre_completo: respuesta.alumno.nombre_completo,
-      numero_cuenta: respuesta.alumno.numero_cuenta,
-      tipo_tramite: respuesta.tipo_tramite,
-      resultado: this.resultadoValido ? 'VALIDO' : 'INVALIDO',
-      detalle: respuesta.estado_acceso,
-    });
+    if (respuesta.estado_acceso !== 'VIGENTE') {
+      this.resultadoValido = false;
+      this.mensajeResultado = '';
+      this.estado = 'resultado';
+      this.historialTurno.unshift({
+        hora: this.horaActual(),
+        nombre_completo: respuesta.alumno.nombre_completo,
+        numero_cuenta: respuesta.alumno.numero_cuenta,
+        tipo_tramite: respuesta.tipo_tramite,
+        resultado: 'INVALIDO',
+        detalle: respuesta.estado_acceso,
+      });
+      this.cdr.detectChanges();
+      return;
+    }
+
+    this.confirmacionIdentidad = null;
+    this.confirmacionVehiculo = respuesta.tipo_tramite === 'ESTACIONAMIENTO' ? null : true;
+    this.motivoDenegacion = '';
+    this.evidenciaArchivo = null;
+    this.estado = 'confirmando';
     this.cdr.detectChanges();
   }
 
@@ -149,25 +170,85 @@ export class Verificacion implements OnDestroy {
     this.cdr.detectChanges();
   }
 
-  abrirModalReporte() {
-    this.descripcionReporte = '';
-    this.mostrarModalReporte = true;
+  // ── Confirmación de identidad / vehículo ──────────────────────
+  seleccionarIdentidad(coincide: boolean) {
+    this.confirmacionIdentidad = coincide;
   }
 
-  cerrarModalReporte() {
-    this.mostrarModalReporte = false;
+  seleccionarVehiculo(coincide: boolean) {
+    this.confirmacionVehiculo = coincide;
   }
 
-  enviarReporte() {
-    if (!this.descripcionReporte.trim()) return;
-    this.cerrarModalReporte();
-    Swal.fire({
-      icon: 'info',
-      title: 'Reporte de incidentes no disponible aún',
-      text: 'Esta función estará activa cuando se implemente el endpoint correspondiente en el backend.',
-      timer: 3500,
-      showConfirmButton: false,
-    });
+  get requiereMotivo(): boolean {
+    return this.confirmacionIdentidad === false || this.confirmacionVehiculo === false;
+  }
+
+  get listoParaConfirmar(): boolean {
+    if (!this.datosAlumno) return false;
+    if (this.confirmacionIdentidad === null) return false;
+    if (this.datosAlumno.tipo_tramite === 'ESTACIONAMIENTO' && this.confirmacionVehiculo === null) {
+      return false;
+    }
+    if (this.requiereMotivo && !this.motivoDenegacion.trim()) return false;
+    return true;
+  }
+
+  onEvidenciaSeleccionada(evento: Event) {
+    const input = evento.target as HTMLInputElement;
+    this.evidenciaArchivo = input.files?.[0] ?? null;
+  }
+
+  cancelarConfirmacion() {
+    this.estado = 'idle';
+    this.datosAlumno = null;
+  }
+
+  confirmarAcceso() {
+    const det = this.datosAlumno;
+    if (!det || !this.listoParaConfirmar) return;
+
+    const identidadConfirmada = !!this.confirmacionIdentidad;
+    const vehiculoCoincide = !!this.confirmacionVehiculo;
+
+    this.registrando = true;
+    this.guardiaService
+      .registrarAcceso({
+        id_guardia: this.idGuardia,
+        id_asignacion: det.id_asignacion,
+        identidad_confirmada: identidadConfirmada,
+        vehiculo_coincide: vehiculoCoincide,
+        motivo: this.requiereMotivo ? this.motivoDenegacion.trim() : undefined,
+        evidencia: this.requiereMotivo ? this.evidenciaArchivo : null,
+      })
+      .subscribe({
+        next: (resp) => {
+          this.registrando = false;
+          this.resultadoValido = identidadConfirmada && vehiculoCoincide;
+          this.mensajeResultado = resp.mensaje;
+          this.mensajeError = '';
+          this.estado = 'resultado';
+
+          this.historialTurno.unshift({
+            hora: this.horaActual(),
+            nombre_completo: det.alumno.nombre_completo,
+            numero_cuenta: det.alumno.numero_cuenta,
+            tipo_tramite: det.tipo_tramite,
+            resultado: this.resultadoValido ? 'VALIDO' : 'INVALIDO',
+            detalle: resp.mensaje,
+          });
+          this.cdr.detectChanges();
+        },
+        error: (err) => {
+          this.registrando = false;
+          Swal.fire({
+            icon: 'error',
+            title: err?.error?.detail || 'No se pudo registrar el acceso.',
+            timer: 2500,
+            showConfirmButton: false,
+          });
+          this.cdr.detectChanges();
+        },
+      });
   }
 
   private horaActual(): string {

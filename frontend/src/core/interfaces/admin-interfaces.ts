@@ -125,15 +125,64 @@ export interface CambioRolPayload {
   nuevo_rol: string;
 }
 
-// Interfaces para datos mock
+// ── Apelación de bloqueo por accesos denegados (3 strikes) ──
 
-export interface AuditoriaMock {
-  id: number;
-  fecha: string;
-  usuario: string;
-  accion: string;
-  descripcion: string;
+export interface AccesoDenegadoHistorial {
+  id_acceso: number;
+  fecha_rechazo: string;
+  guardia: string;
+  tramite: string;
+  folio: string;
+  qr_token: string;
+  vigencia: string;
+  motivo: string;
+  evidencia: string | null;
 }
+
+export interface HistorialAccesosDenegadosResponse {
+  numero_cuenta: string;
+  historial_denegados: AccesoDenegadoHistorial[];
+}
+
+export interface DesbloquearAccesoPayload {
+  id_admin: number;
+  comentario: string;
+}
+
+export interface DesbloquearAccesoResponse {
+  mensaje: string;
+  permisos_restaurados: number;
+}
+
+// ── Auditoría de accesos (guardia) ──────────────
+
+export interface RegistroAccesoAuditoria {
+  id_acceso: number;
+  fecha_hora: string;
+  estado_acceso: 'PERMITIDO' | 'DENEGADO';
+  identidad_confirmada: boolean;
+  vehiculo_coincide: boolean;
+  guardia_turno: string;
+  alumno: {
+    numero_cuenta: string;
+    nombre: string;
+  };
+  tramite: string;
+  vehiculo: {
+    placas: string;
+    modelo: string;
+  };
+}
+
+export interface AuditoriaAccesosResponse {
+  pagina_actual: number;
+  registros_por_pagina: number;
+  total_registros: number;
+  total_paginas: number;
+  resultados: RegistroAccesoAuditoria[];
+}
+
+// Interfaces para datos mock
 
 export interface RequisitoMock {
   id: number;
@@ -171,4 +220,16 @@ export interface CrearPersonalPayload {
   contrasena: string;
   rol: string;
   correo_electronico?: string;
+}
+
+export interface CrearGuardiaPayload {
+  nombre: string;
+  apellidos: string;
+  correo_electronico: string;
+}
+
+export interface CrearGuardiaResponse {
+  mensaje: string;
+  id_admin: number;
+  numero_cuenta_generado: string;
 }

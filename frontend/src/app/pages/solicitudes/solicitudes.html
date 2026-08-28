@@ -13,6 +13,13 @@
       <h2 class="page-head__title">Gestión de Solicitudes</h2>
       <p class="page-head__subtitle">Gestiona y revisa las solicitudes recibidas.</p>
     </div>
+    <button type="button" class="btn-exportar" [disabled]="exportandoExcel()" (click)="exportarExcel()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+      </svg>
+      {{ exportandoExcel() ? 'Generando…' : 'Exportar auditoría (Excel)' }}
+    </button>
   </header>
 
   <!-- Panel de tabla -->
@@ -159,6 +166,17 @@
           </div>
         } @else if (solicitudDetalle()) {
 
+          @if (bloqueadaPorOtroAdmin()) {
+            <div class="sap-estado sap-estado--warn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 8v4m0 4h.01"/>
+              </svg>
+              Otro administrador ya está revisando esta solicitud. Solo puedes consultarla en modo lectura.
+            </div>
+          }
+
           <!-- Info de la solicitud -->
           <div class="modal-info-row">
             <div class="modal-info-item">
@@ -249,7 +267,7 @@
                   }
 
                   <!-- Botones aprobar / rechazar documento -->
-                  @if (doc.estado_documento === 'PENDIENTE' && !rechazandoDoc()[doc.id_documento]) {
+                  @if (doc.estado_documento === 'PENDIENTE' && !rechazandoDoc()[doc.id_documento] && !bloqueadaPorOtroAdmin()) {
                     <div class="doc-actions">
                       <button
                         class="btn-aprobar"

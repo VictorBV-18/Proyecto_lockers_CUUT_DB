@@ -15,11 +15,12 @@ export class Notificaciones implements OnInit {
   notificaciones: Notificacion[] = [];
   cargando = false;
   cargandoMas = false;
+  marcandoTodas = false;
   paginaActual = 1;
   totalPaginas = 1;
 
   constructor(
-    private notificacionService: NotificacionService,
+    public notificacionService: NotificacionService,
     private cdr: ChangeDetectorRef,
   ) {}
 
@@ -60,12 +61,28 @@ export class Notificaciones implements OnInit {
 
   marcarLeida(notificacion: Notificacion): void {
     if (notificacion.leida) return;
-    this.notificacionService.notificacionLeida(notificacion.id_notificacion).subscribe({
+    this.notificacionService.notificacionLeida(notificacion.id_notificacion, this.numeroCuenta).subscribe({
       next: () => {
         notificacion.leida = true;
         this.cdr.detectChanges();
       },
       error: () => {},
+    });
+  }
+
+  marcarTodasLeidas(): void {
+    if (this.marcandoTodas) return;
+    this.marcandoTodas = true;
+    this.notificacionService.marcarTodasLeidas(this.numeroCuenta, this.rolUsuario).subscribe({
+      next: () => {
+        this.notificaciones = this.notificaciones.map((n) => ({ ...n, leida: true }));
+        this.marcandoTodas = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.marcandoTodas = false;
+        this.cdr.detectChanges();
+      },
     });
   }
 

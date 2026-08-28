@@ -16,12 +16,12 @@
       </svg>
       Exportar PDF
     </button>
-    <button class="aud-btn aud-btn--export-excel" (click)="exportarExcel()">
+    <button class="aud-btn aud-btn--export-excel" [disabled]="exportando" (click)="exportarExcel()">
       <svg class="aud-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
       </svg>
-      Exportar Excel
+      {{ exportando ? 'Generando…' : 'Exportar Excel' }}
     </button>
   </div>
 </div>
@@ -50,7 +50,7 @@
           id="aud-search"
           type="text"
           class="aud-field-input aud-field-input--search"
-          placeholder="Usuario, acción o descripción..."
+          placeholder="Guardia, alumno o trámite..."
           [(ngModel)]="filtroBusqueda"
           (ngModelChange)="aplicarFiltros()"
         />
@@ -58,10 +58,10 @@
     </div>
 
     <div class="aud-filter-group">
-      <label class="aud-filter-label">Tipo de Acción</label>
-      <select id="aud-accion" class="aud-field-input" [(ngModel)]="filtroAccion" (ngModelChange)="aplicarFiltros()">
-        <option value="">Todas las acciones</option>
-        <option *ngFor="let a of acciones" [value]="a">{{ a }}</option>
+      <label class="aud-filter-label">Estado del acceso</label>
+      <select id="aud-estado" class="aud-field-input" [(ngModel)]="filtroEstado" (ngModelChange)="aplicarFiltros()">
+        <option value="">Todos los estados</option>
+        <option *ngFor="let e of estados" [value]="e">{{ e }}</option>
       </select>
     </div>
 
@@ -93,25 +93,37 @@
       <thead>
         <tr>
           <th>Fecha / Hora</th>
-          <th>Usuario</th>
-          <th>Acción</th>
-          <th>Descripción</th>
+          <th>Guardia</th>
+          <th>Alumno</th>
+          <th>Trámite</th>
+          <th>Vehículo</th>
+          <th>Estado</th>
         </tr>
       </thead>
       <tbody>
-        <!-- Filas de datos (cuando el endpoint esté disponible) -->
+        <!-- Estado de carga -->
+        <tr *ngIf="cargando">
+          <td colspan="6" class="aud-td-empty">Cargando registros de acceso…</td>
+        </tr>
+
+        <!-- Filas de datos -->
         <tr *ngFor="let r of registrosFiltrados">
-          <td class="aud-td-fecha">{{ r.fecha }}</td>
-          <td class="aud-td-usuario">{{ r.usuario }}</td>
+          <td class="aud-td-fecha">{{ formatearFechaHora(r.fecha_hora) }}</td>
+          <td class="aud-td-usuario">{{ r.guardia_turno }}</td>
           <td>
-            <span class="aud-badge" [ngClass]="getAccionClase(r.accion)">{{ r.accion }}</span>
+            {{ r.alumno.nombre }}
+            <span class="aud-td-desc">({{ r.alumno.numero_cuenta }})</span>
           </td>
-          <td class="aud-td-desc">{{ r.descripcion }}</td>
+          <td>{{ r.tramite }}</td>
+          <td class="aud-td-desc">{{ r.vehiculo.placas }} · {{ r.vehiculo.modelo }}</td>
+          <td>
+            <span class="aud-badge" [ngClass]="getEstadoClase(r.estado_acceso)">{{ r.estado_acceso }}</span>
+          </td>
         </tr>
 
         <!-- Estado vacío -->
-        <tr *ngIf="registrosFiltrados.length === 0">
-          <td colspan="4" class="aud-td-empty">
+        <tr *ngIf="!cargando && registrosFiltrados.length === 0">
+          <td colspan="6" class="aud-td-empty">
             <div class="aud-empty-state">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
                    stroke-linecap="round" stroke-linejoin="round" class="aud-empty-icon">
@@ -120,7 +132,7 @@
               </svg>
               <p class="aud-empty-title">Sin registros de auditoría</p>
               <p class="aud-empty-sub">
-                Los registros aparecerán aquí cuando el endpoint de auditoría esté disponible.
+                No se encontraron accesos registrados por los guardias con los filtros actuales.
               </p>
             </div>
           </td>

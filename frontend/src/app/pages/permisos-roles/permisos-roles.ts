@@ -1,8 +1,9 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { forkJoin, Observable } from 'rxjs';
 import Swal from 'sweetalert2';
 import { AdminService } from '../../../core/service/admin-service';
-import { UsuarioSistema } from '../../../core/interfaces/admin-interfaces';
+import { AccesoDenegadoHistorial, UsuarioSistema } from '../../../core/interfaces/admin-interfaces';
 
 @Component({
   selector: 'app-permisos-roles',
@@ -29,9 +30,21 @@ export class PermisosRoles implements OnInit {
   nuevoEstado = true;
   guardando = false;
 
+  // ── Apelación de bloqueo por accesos denegados (3 strikes) ──
+  mostrarModalApelacion = false;
+  usuarioApelacion: UsuarioSistema | null = null;
+  historialDenegados: AccesoDenegadoHistorial[] = [];
+  cargandoHistorial = false;
+  comentarioDesbloqueo = '';
+  desbloqueando = false;
+  evidenciaPreview: SafeResourceUrl | null = null;
+
+  private idAdmin = Number(localStorage.getItem('idAdmin')) || 0;
+
   constructor(
     private adminService: AdminService,
     private cdr: ChangeDetectorRef,
+    private sanitizer: DomSanitizer,
   ) {}
 
   ngOnInit() {
@@ -159,5 +172,84 @@ export class PermisosRoles implements OnInit {
         });
       },
     });
+  }
+
+  // ── Apelación de bloqueo por accesos denegados (3 strikes) ──
+
+  abrirApelacion(usuario: UsuarioSistema) {
+    this.usuarioApelacion = usuario;
+    this.mostrarModalApelacion = true;
+    this.cargandoHistorial = true;
+    this.historialDenegados = [];
+    this.comentarioDesbloqueo = '';
+    this.evidenciaPreview = null;
+
+    this.adminService.consultarEvidenciasApelacion(usuario.numero_cuenta).subscribe({
+      next: (resp) => {
+        this.historialDenegados = resp.historial_denegados;
+        this.cargandoHistorial = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.cargandoHistorial = false;
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  cerrarApelacion() {
+    this.mostrarModalApelacion = false;
+    this.usuarioApelacion = null;
+    this.historialDenegados = [];
+    this.comentarioDesbloqueo = '';
+    this.evidenciaPreview = null;
+  }
+
+  verEvidencia(registro: AccesoDenegadoHistorial) {
+    if (!registro.evidencia) return;
+    const url = this.adminService.obtenerUrlEvidenciaAcceso(registro.id_acceso);
+    this.evidenciaPreview = this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  }
+
+  cerrarPreviewEvidencia() {
+    this.evidenciaPreview = null;
+  }
+
+  desbloquearAcceso() {
+    const usuario = this.usuarioApelacion;
+    if (!usuario) return;
+
+    const comentario = this.comentarioDesbloqueo.trim();
+    if (!comentario) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Ingresa un comentario para justificar el desbloqueo.',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      return;
+    }
+
+    this.desbloqueando = true;
+    this.adminService
+      .desbloquearAccesoAlumno(usuario.numero_cuenta, { id_admin: this.idAdmin, comentario })
+      .subscribe({
+        next: (resp) => {
+          this.desbloqueando = false;
+          this.cerrarApelacion();
+          Swal.fire({ icon: 'success', title: resp.mensaje, timer: 2800, showConfirmButton: false });
+          this.cargarUsuarios(this.paginaActual);
+        },
+        error: (err) => {
+          this.desbloqueando = false;
+          this.cdr.detectChanges();
+          Swal.fire({
+            icon: 'error',
+            title: err?.error?.detail || 'No se pudo desbloquear al alumno.',
+            timer: 3000,
+            showConfirmButton: false,
+          });
+        },
+      });
   }
 }

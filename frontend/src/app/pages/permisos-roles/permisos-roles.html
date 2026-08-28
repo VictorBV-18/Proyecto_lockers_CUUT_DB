@@ -51,8 +51,15 @@
                 {{ u.estado_activo ? 'Habilitado' : 'Deshabilitado' }}
               </span>
             </td>
-            <td>
+            <td class="td-actions">
               <button class="btn btn--sm btn--outline" (click)="abrirModal(u)">Editar</button>
+              <button
+                *ngIf="u.rol === 'ALUMNO' && !u.estado_activo"
+                class="btn btn--sm btn--warning"
+                (click)="abrirApelacion(u)"
+              >
+                Ver apelación
+              </button>
             </td>
           </tr>
           <tr *ngIf="usuarios.length === 0">
@@ -109,6 +116,84 @@
       <button class="btn btn--primary" [disabled]="guardando" (click)="guardarCambios()">
         {{ guardando ? 'Guardando...' : 'Guardar Cambios' }}
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Apelación / Desbloqueo de acceso -->
+<div class="modal-overlay" *ngIf="mostrarModalApelacion" (click)="cerrarApelacion()">
+  <div class="modal-content modal-content--wide" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">Historial de accesos denegados</h3>
+      <button class="modal-close" (click)="cerrarApelacion()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-text">
+        Alumno <strong>{{ usuarioApelacion?.nombre_completo }}</strong>
+        ({{ usuarioApelacion?.numero_cuenta }})
+      </p>
+
+      <div *ngIf="cargandoHistorial" class="td-empty">Cargando historial…</div>
+
+      <ng-container *ngIf="!cargandoHistorial">
+        <div *ngIf="historialDenegados.length === 0" class="td-empty">
+          No hay accesos denegados registrados para este alumno.
+        </div>
+
+        <div class="apelacion-list" *ngIf="historialDenegados.length > 0">
+          <div class="apelacion-item" *ngFor="let r of historialDenegados">
+            <div class="apelacion-item__row">
+              <span class="apelacion-item__fecha">{{ r.fecha_rechazo }}</span>
+              <span class="badge badge--muted">{{ r.tramite }}</span>
+            </div>
+            <p class="apelacion-item__motivo">{{ r.motivo }}</p>
+            <div class="apelacion-item__meta">
+              <span>Guardia: {{ r.guardia }}</span>
+              <span>Folio: {{ r.folio }}</span>
+            </div>
+            <button
+              type="button"
+              class="btn btn--sm btn--outline"
+              *ngIf="r.evidencia"
+              (click)="verEvidencia(r)"
+            >
+              Ver evidencia fotográfica
+            </button>
+          </div>
+        </div>
+      </ng-container>
+
+      <label class="field-label">Comentario del desbloqueo</label>
+      <textarea
+        class="field-input"
+        rows="3"
+        placeholder="Explica por qué se acepta la apelación…"
+        [(ngModel)]="comentarioDesbloqueo"
+        [disabled]="desbloqueando"
+      ></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn--ghost" [disabled]="desbloqueando" (click)="cerrarApelacion()">Cancelar</button>
+      <button
+        class="btn btn--primary"
+        [disabled]="desbloqueando || !comentarioDesbloqueo.trim()"
+        (click)="desbloquearAcceso()"
+      >
+        {{ desbloqueando ? 'Desbloqueando…' : 'Desbloquear cuenta' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Preview de evidencia fotográfica -->
+<div class="modal-overlay" *ngIf="evidenciaPreview" (click)="cerrarPreviewEvidencia()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">Evidencia fotográfica</h3>
+      <button class="modal-close" (click)="cerrarPreviewEvidencia()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <img [src]="evidenciaPreview" alt="Evidencia del acceso denegado" class="apelacion-evidencia-img" />
     </div>
   </div>
 </div>

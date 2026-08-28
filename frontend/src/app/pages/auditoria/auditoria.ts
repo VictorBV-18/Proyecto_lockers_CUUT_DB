@@ -1,5 +1,8 @@
 import { Component, OnInit } from '@angular/core';
-import { AuditoriaMock } from '../../../core/interfaces/admin-interfaces';
+import { AdminService } from '../../../core/service/admin-service';
+import { RegistroAccesoAuditoria } from '../../../core/interfaces/admin-interfaces';
+import { descargarBlob, formatearFecha } from '../../../helpers/helpers';
+import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-auditoria',
@@ -8,29 +11,41 @@ import { AuditoriaMock } from '../../../core/interfaces/admin-interfaces';
   styleUrl: './auditoria.css',
 })
 export class Auditoria implements OnInit {
-  registros: AuditoriaMock[] = [];
-  registrosFiltrados: AuditoriaMock[] = [];
+  registros: RegistroAccesoAuditoria[] = [];
+  registrosFiltrados: RegistroAccesoAuditoria[] = [];
+  cargando = false;
+  exportando = false;
 
   // Filtros
   filtroBusqueda = '';
-  filtroAccion = '';
+  filtroEstado = '';
   filtroFecha = '';
 
-  acciones = [
-    'LOGIN',
-    'LOGOUT',
-    'APROBACIÓN',
-    'RECHAZO',
-    'BAJA_LOCKER',
-    'LIBERACION_MASIVA',
-    'EDICION_USUARIO',
-    'CONFIGURACION',
-  ];
+  estados = ['PERMITIDO', 'DENEGADO'];
+
+  constructor(private adminService: AdminService) {}
 
   ngOnInit() {
-    // Tabla vacía — los datos vendrán del endpoint de auditoría cuando esté disponible
-    this.registros = [];
-    this.registrosFiltrados = [];
+    this.cargando = true;
+    this.obtenerPaginaDeAuditoria(1, []);
+  }
+
+  private obtenerPaginaDeAuditoria(page: number, acumulado: RegistroAccesoAuditoria[]): void {
+    this.adminService.obtenerAuditoriaAccesos(page).subscribe({
+      next: (respuesta) => {
+        const combinado = [...acumulado, ...respuesta.resultados];
+        if (page < respuesta.total_paginas) {
+          this.obtenerPaginaDeAuditoria(page + 1, combinado);
+          return;
+        }
+        this.registros = combinado;
+        this.aplicarFiltros();
+        this.cargando = false;
+      },
+      error: () => {
+        this.cargando = false;
+      },
+    });
   }
 
   aplicarFiltros() {
@@ -40,18 +55,19 @@ export class Auditoria implements OnInit {
       const busq = this.filtroBusqueda.toLowerCase();
       resultado = resultado.filter(
         (r) =>
-          r.usuario.toLowerCase().includes(busq) ||
-          r.descripcion.toLowerCase().includes(busq) ||
-          r.accion.toLowerCase().includes(busq)
+          r.guardia_turno.toLowerCase().includes(busq) ||
+          r.alumno.nombre.toLowerCase().includes(busq) ||
+          r.alumno.numero_cuenta.toLowerCase().includes(busq) ||
+          r.tramite.toLowerCase().includes(busq)
       );
     }
 
-    if (this.filtroAccion) {
-      resultado = resultado.filter((r) => r.accion === this.filtroAccion);
+    if (this.filtroEstado) {
+      resultado = resultado.filter((r) => r.estado_acceso === this.filtroEstado);
     }
 
     if (this.filtroFecha) {
-      resultado = resultado.filter((r) => r.fecha.startsWith(this.filtroFecha));
+      resultado = resultado.filter((r) => r.fecha_hora.startsWith(this.filtroFecha));
     }
 
     this.registrosFiltrados = resultado;
@@ -59,7 +75,7 @@ export class Auditoria implements OnInit {
 
   limpiarFiltros() {
     this.filtroBusqueda = '';
-    this.filtroAccion = '';
+    this.filtroEstado = '';
     this.filtroFecha = '';
     this.aplicarFiltros();
   }
@@ -70,21 +86,32 @@ export class Auditoria implements OnInit {
   }
 
   exportarExcel() {
-    // Placeholder — pendiente de implementación con endpoint de auditoría
-    alert('Exportar Excel estará disponible cuando se implemente el endpoint de auditoría.');
+    this.exportando = true;
+    this.adminService.exportarAuditoriaAccesosExcel().subscribe({
+      next: (blob) => {
+        descargarBlob(blob, 'Registro_de_auditoria_accesos_CUUT.xlsx');
+        this.exportando = false;
+      },
+      error: () => {
+        this.exportando = false;
+        Swal.fire({
+          icon: 'error',
+          title: 'No se pudo generar el archivo Excel.',
+          timer: 2200,
+          showConfirmButton: false,
+        });
+      },
+    });
   }
 
-  getAccionClase(accion: string): string {
-    const mapa: Record<string, string> = {
-      LOGIN: 'badge--info',
-      LOGOUT: 'badge--muted',
-      APROBACIÓN: 'badge--success',
-      RECHAZO: 'badge--danger',
-      BAJA_LOCKER: 'badge--warning',
-      LIBERACION_MASIVA: 'badge--danger',
-      EDICION_USUARIO: 'badge--info',
-      CONFIGURACION: 'badge--warning',
-    };
-    return mapa[accion] || 'badge--muted';
+  getEstadoClase(estado: string): string {
+    return estado === 'PERMITIDO' ? 'badge--success' : 'badge--danger';
+  }
+
+  formatearFechaHora(fechaHora: string): string {
+    const fecha = formatearFecha(fechaHora);
+    const parteHora = fechaHora.split(/[T ]/)[1];
+    const hora = parteHora ? parteHora.slice(0, 5) : '';
+    return hora ? `${fecha}, ${hora}` : fecha;
   }
 }

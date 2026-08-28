@@ -42,6 +42,35 @@
                   >
                 </td>
                 <td class="td-actions">
+                  @if (sol.estado_solicitud === 'VENCIDA') {
+                    <button
+                      type="button"
+                      class="btn-reponer"
+                      (click)="irANuevaSolicitud()"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                      </svg>
+                      Solicitar reposición
+                    </button>
+                  }
+                  @if (sol.estado_solicitud === 'APROBADA') {
+                    <button
+                      type="button"
+                      class="icon-btn icon-btn--detalles"
+                      aria-label="Ver detalles del recurso asignado"
+                      title="Detalles del recurso asignado"
+                      (click)="verDetallesRecurso(sol)"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="16" x2="12" y2="11"/>
+                        <line x1="12" y1="8" x2="12.01" y2="8"/>
+                      </svg>
+                    </button>
+                  }
                   @if (sol.qr_token && sol.estado_solicitud === 'APROBADA') {
                     <button
                       type="button"
@@ -131,6 +160,41 @@
               <i class="dot"></i>{{ solicitudSeleccionada.estado_solicitud }}
             </span>
           </div>
+
+          @if (solicitudSeleccionada.estado_solicitud === 'REPOSICION') {
+            <div class="info-banner info-banner--warning">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 8v4m0 4h.01"/>
+              </svg>
+              <p>
+                Esta es una solicitud de <strong>reposición</strong>: tu trámite anterior de
+                {{ getTipoLabel(solicitudSeleccionada.tipo_tramite) }} venció o finalizó. Se
+                encuentra en revisión igual que una solicitud normal.
+              </p>
+            </div>
+          }
+
+          @if (solicitudSeleccionada.estado_solicitud === 'VENCIDA') {
+            <div class="info-banner info-banner--danger">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 8v4m0 4h.01"/>
+              </svg>
+              <div class="info-banner__content">
+                <p>
+                  Tu permiso de {{ getTipoLabel(solicitudSeleccionada.tipo_tramite) }}
+                  <strong>venció</strong>. Para seguir usando el recurso debes generar una nueva
+                  solicitud; el sistema la marcará automáticamente como reposición.
+                </p>
+                <button type="button" class="btn-reponer" (click)="irANuevaSolicitud()">
+                  Solicitar reposición
+                </button>
+              </div>
+            </div>
+          }
 
           <!-- Lista de documentos -->
           @if (solicitudSeleccionada.documentos_tramite.length === 0) {
@@ -241,6 +305,130 @@
                 Re-enviar Solicitud
               </button>
             </div>
+          }
+
+        }
+      </div><!-- /modal-body -->
+
+    </div><!-- /modal-panel -->
+  </div><!-- /modal-backdrop -->
+}
+
+<!-- ======================================================
+     Modal: Detalles del recurso asignado
+     ====================================================== -->
+@if (modalRecursoAbierto) {
+  <div class="modal-backdrop" (click)="cerrarModalRecurso()">
+    <div class="modal-panel" (click)="$event.stopPropagation()">
+
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Detalles del Recurso Asignado</h3>
+          @if (recursoActivo) {
+            <p class="modal-subtitle">
+              {{ recursoActivo.documento?.folio || ('FOL-' + recursoActivo.id_solicitud) }} &middot; {{ getTipoLabel(recursoActivo.tipo_tramite) }}
+            </p>
+          }
+        </div>
+        <button class="modal-close" (click)="cerrarModalRecurso()" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6 6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+
+        @if (cargandoRecurso) {
+          <div class="modal-loading">
+            <span class="spinner"></span>
+            Cargando detalles del recurso…
+          </div>
+        } @else if (recursoActivo) {
+
+          <div class="recurso-section">
+            <p class="recurso-section__label">
+              {{ recursoActivo.tipo_tramite === 'locker' ? 'Locker asignado' : 'Vehículo registrado' }}
+            </p>
+
+            @if (recursoActivo.tipo_tramite === 'locker') {
+              <div class="recurso-grid">
+                <div class="recurso-field">
+                  <span class="label-muted">Código de locker</span>
+                  <span class="recurso-value">{{ recursoActivo.detalles_recurso.codigo_locker || 'No asignado' }}</span>
+                </div>
+                <div class="recurso-field">
+                  <span class="label-muted">Ubicación</span>
+                  <span class="recurso-value">{{ recursoActivo.detalles_recurso.ubicacion || 'No asignado' }}</span>
+                </div>
+              </div>
+            } @else {
+              <div class="recurso-grid">
+                <div class="recurso-field">
+                  <span class="label-muted">Placas</span>
+                  <span class="recurso-value">{{ recursoActivo.detalles_recurso.vehiculo?.placas || '—' }}</span>
+                </div>
+                <div class="recurso-field">
+                  <span class="label-muted">Modelo</span>
+                  <span class="recurso-value">{{ recursoActivo.detalles_recurso.vehiculo?.modelo || '—' }}</span>
+                </div>
+                <div class="recurso-field">
+                  <span class="label-muted">Color</span>
+                  <span class="recurso-value">{{ recursoActivo.detalles_recurso.vehiculo?.color || '—' }}</span>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="recurso-section">
+            <p class="recurso-section__label">Asignación</p>
+            <div class="recurso-grid">
+              <div class="recurso-field">
+                <span class="label-muted">Fecha de asignación</span>
+                <span class="recurso-value">
+                  {{ recursoActivo.fecha_asignacion ? getFechaFormateada(recursoActivo.fecha_asignacion) : 'No disponible' }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          @if (recursoActivo.documento; as documento) {
+            <div class="recurso-section">
+              <p class="recurso-section__label">Constancia</p>
+              <div class="recurso-grid">
+                <div class="recurso-field">
+                  <span class="label-muted">Folio</span>
+                  <span class="recurso-value">{{ documento.folio }}</span>
+                </div>
+                <div class="recurso-field">
+                  <span class="label-muted">Vigencia</span>
+                  <span class="recurso-value">{{ getFechaFormateada(documento.vigencia) }}</span>
+                </div>
+                <div class="recurso-field">
+                  <span class="label-muted">Estado</span>
+                  <span class="badge badge--sm" [ngClass]="'badge--' + getClaseEstado(documento.estado)">
+                    <i class="dot"></i>{{ documento.estado }}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                class="btn-reenviar recurso-descarga"
+                (click)="solicitudesUsuario.descargarDocumento(documento.qr_token)"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Descargar comprobante
+              </button>
+            </div>
+          } @else {
+            <p class="modal-empty">Aún no se ha generado la constancia para este trámite.</p>
           }
 
         }

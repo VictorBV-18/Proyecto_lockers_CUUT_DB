@@ -21,6 +21,21 @@ export interface VerificacionQrResponse {
   vehiculo: VehiculoVerificacion | null;
 }
 
+// Contrato real de POST /guardia/registrar-acceso
+export interface RegistrarAccesoPayload {
+  id_guardia: number;
+  id_asignacion: number;
+  identidad_confirmada: boolean;
+  vehiculo_coincide: boolean;
+  motivo?: string;
+  evidencia?: File | null;
+}
+
+export interface RegistrarAccesoResponse {
+  mensaje: string;
+  id_acceso: number;
+}
+
 export interface HistorialVerificacionItem {
   hora: string;
   nombre_completo: string;

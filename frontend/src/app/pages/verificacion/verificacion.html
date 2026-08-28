@@ -25,6 +25,86 @@
     Cancelar
   </button>
 
+  <!-- Confirmación de identidad / vehículo antes de registrar el acceso -->
+  <div class="confirm-card" *ngIf="estado === 'confirmando' && datosAlumno as det">
+    <p class="confirm-title">Permiso vigente — confirma antes de autorizar el acceso</p>
+
+    <div class="result-datos">
+      <div class="result-row"><span>Alumno</span><strong>{{ det.alumno.nombre_completo }}</strong></div>
+      <div class="result-row"><span>No. Cuenta</span><strong>{{ det.alumno.numero_cuenta }}</strong></div>
+      <div class="result-row"><span>Carrera</span><strong>{{ det.alumno.carrera }}</strong></div>
+      <div class="result-row"><span>Trámite</span><strong>{{ det.tipo_tramite }}</strong></div>
+      <div class="result-row" *ngIf="det.vehiculo">
+        <span>Vehículo</span>
+        <strong>{{ det.vehiculo.placas }} · {{ det.vehiculo.modelo }} ({{ det.vehiculo.color }})</strong>
+      </div>
+    </div>
+
+    <div class="confirm-question">
+      <span class="confirm-question__label">¿La identidad de la persona coincide con estos datos?</span>
+      <div class="confirm-question__actions">
+        <button
+          type="button"
+          class="btn btn--outline confirm-btn--si"
+          [class.confirm-btn--activo]="confirmacionIdentidad === true"
+          (click)="seleccionarIdentidad(true)"
+        >
+          Sí coincide
+        </button>
+        <button
+          type="button"
+          class="btn btn--outline confirm-btn--no"
+          [class.confirm-btn--activo]="confirmacionIdentidad === false"
+          (click)="seleccionarIdentidad(false)"
+        >
+          No coincide
+        </button>
+      </div>
+    </div>
+
+    <div class="confirm-question" *ngIf="det.tipo_tramite === 'ESTACIONAMIENTO'">
+      <span class="confirm-question__label">¿El vehículo coincide con estos datos?</span>
+      <div class="confirm-question__actions">
+        <button
+          type="button"
+          class="btn btn--outline confirm-btn--si"
+          [class.confirm-btn--activo]="confirmacionVehiculo === true"
+          (click)="seleccionarVehiculo(true)"
+        >
+          Sí coincide
+        </button>
+        <button
+          type="button"
+          class="btn btn--outline confirm-btn--no"
+          [class.confirm-btn--activo]="confirmacionVehiculo === false"
+          (click)="seleccionarVehiculo(false)"
+        >
+          No coincide
+        </button>
+      </div>
+    </div>
+
+    <div class="confirm-motivo" *ngIf="requiereMotivo">
+      <label class="field-label">Motivo del rechazo *</label>
+      <textarea
+        class="field-textarea"
+        rows="3"
+        [(ngModel)]="motivoDenegacion"
+        placeholder="Ej: la identidad no coincide con el tarjetón, el vehículo es distinto al registrado, indicios de tarjetón compartido..."
+      ></textarea>
+
+      <label class="field-label">Evidencia fotográfica (opcional)</label>
+      <input type="file" accept="image/*" (change)="onEvidenciaSeleccionada($event)" />
+    </div>
+
+    <div class="result-actions confirm-actions">
+      <button class="btn btn--ghost" [disabled]="registrando" (click)="cancelarConfirmacion()">Cancelar</button>
+      <button class="btn btn--primary" [disabled]="!listoParaConfirmar || registrando" (click)="confirmarAcceso()">
+        {{ registrando ? 'Registrando…' : 'Confirmar y registrar acceso' }}
+      </button>
+    </div>
+  </div>
+
   <!-- Resultado -->
   <div
     class="result-card"
@@ -48,10 +128,10 @@
     </div>
 
     <p class="scanner-error" *ngIf="mensajeError">{{ mensajeError }}</p>
+    <p class="result-mensaje" *ngIf="mensajeResultado">{{ mensajeResultado }}</p>
 
     <div class="result-actions">
       <button class="btn btn--primary" (click)="escanearSiguiente()">Escanear siguiente</button>
-      <button class="btn btn--danger-outline" (click)="abrirModalReporte()">Reportar incidente</button>
     </div>
   </div>
 
@@ -91,32 +171,6 @@
           </tr>
         </tbody>
       </table>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Reportar Incidente -->
-<div class="modal-overlay" *ngIf="mostrarModalReporte" (click)="cerrarModalReporte()">
-  <div class="modal-content" (click)="$event.stopPropagation()">
-    <div class="modal-header">
-      <h3 class="modal-title">Reportar incidente</h3>
-      <button class="modal-close" (click)="cerrarModalReporte()">&times;</button>
-    </div>
-    <div class="modal-body">
-      <p class="modal-text" *ngIf="datosAlumno">
-        Alumno: <strong>{{ datosAlumno.alumno.nombre_completo }}</strong> ({{ datosAlumno.alumno.numero_cuenta }})
-      </p>
-      <label class="field-label">Descripción del incidente *</label>
-      <textarea
-        class="field-textarea"
-        [(ngModel)]="descripcionReporte"
-        rows="4"
-        placeholder="Ej: la identidad no coincide con el tarjetón, el vehículo es distinto al registrado, indicios de tarjetón compartido..."
-      ></textarea>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn--ghost" (click)="cerrarModalReporte()">Cancelar</button>
-      <button class="btn btn--danger" [disabled]="!descripcionReporte.trim()" (click)="enviarReporte()">Enviar reporte</button>
     </div>
   </div>
 </div>

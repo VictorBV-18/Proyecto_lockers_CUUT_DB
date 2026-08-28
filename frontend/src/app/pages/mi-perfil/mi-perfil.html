@@ -14,12 +14,8 @@
         <input type="text" class="field-input" [value]="perfil.numero_cuenta" readonly />
       </div>
       <div class="form-field">
-        <label class="field-label">Nombre(s)</label>
-        <input type="text" class="field-input" [value]="perfil['nombre (s)']" readonly />
-      </div>
-      <div class="form-field">
-        <label class="field-label">Apellidos</label>
-        <input type="text" class="field-input" [value]="perfil.apellidos" readonly />
+        <label class="field-label">Nombre completo</label>
+        <input type="text" class="field-input" [value]="perfil.nombre_completo" readonly />
       </div>
       <div class="form-field">
         <label class="field-label">Carrera</label>
@@ -33,25 +29,27 @@
   </div>
 }
 
-@if (vehiculo) {
+@if (perfil && perfil.vehiculos_registrados.length > 0) {
   <div class="config-card">
-    <h3 class="card-title">Información del Vehículo</h3>
-    <p class="card-desc">Datos registrados en tu trámite de estacionamiento activo.</p>
+    <h3 class="card-title">Vehículos Registrados</h3>
+    <p class="card-desc">Datos de los vehículos registrados en tus trámites de estacionamiento.</p>
 
-    <div class="form-grid">
-      <div class="form-field">
-        <label class="field-label">Placas</label>
-        <input type="text" class="field-input" [value]="vehiculo.detalles_recurso.placas" readonly />
+    @for (vehiculo of perfil.vehiculos_registrados; track $index) {
+      <div class="form-grid">
+        <div class="form-field">
+          <label class="field-label">Placas</label>
+          <input type="text" class="field-input" [value]="vehiculo.placas" readonly />
+        </div>
+        <div class="form-field">
+          <label class="field-label">Modelo</label>
+          <input type="text" class="field-input" [value]="vehiculo.modelo" readonly />
+        </div>
+        <div class="form-field">
+          <label class="field-label">Color</label>
+          <input type="text" class="field-input" [value]="vehiculo.color" readonly />
+        </div>
       </div>
-      <div class="form-field">
-        <label class="field-label">Modelo</label>
-        <input type="text" class="field-input" [value]="vehiculo.detalles_recurso.modelo" readonly />
-      </div>
-      <div class="form-field">
-        <label class="field-label">Color</label>
-        <input type="text" class="field-input" [value]="vehiculo.detalles_recurso.color" readonly />
-      </div>
-    </div>
+    }
   </div>
 }
 
@@ -78,7 +76,8 @@
         type="password"
         class="field-input"
         [(ngModel)]="contrasenaNueva"
-        placeholder="Nueva contraseña"
+        minlength="8"
+        placeholder="Mínimo 8 caracteres"
       />
     </div>
 
