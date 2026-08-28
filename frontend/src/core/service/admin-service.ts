@@ -18,10 +18,16 @@ import {
   AceptarSolicitudResponse,
   CrearAlumnoPayload,
   CrearPersonalPayload,
+  CrearGuardiaPayload,
+  CrearGuardiaResponse,
   CambioEstadoPayload,
   CambioRolPayload,
   LiberacionMasivaPayload,
   LiberacionMasivaResponse,
+  AuditoriaAccesosResponse,
+  HistorialAccesosDenegadosResponse,
+  DesbloquearAccesoPayload,
+  DesbloquearAccesoResponse,
 
 } from '../interfaces/admin-interfaces';
 
@@ -83,12 +89,63 @@ export class AdminService {
     return this.http.post(`${this.API_URL}/admin/usuarios/personal`, datos);
   }
 
+  // Autogenera número de cuenta (900XXXX) y contraseña, y envía las credenciales por correo.
+  crearCuentaGuardia(datos: CrearGuardiaPayload): Observable<CrearGuardiaResponse> {
+    return this.http.post<CrearGuardiaResponse>(`${this.API_URL}/admin/usuarios/guardia`, datos);
+  }
+
   cambiarEstadoUsuario(datos: CambioEstadoPayload): Observable<any> {
     return this.http.put(`${this.API_URL}/admin/usuarios/estado`, datos);
   }
 
   cambiarRolUsuario(datos: CambioRolPayload): Observable<any> {
     return this.http.put(`${this.API_URL}/admin/usuarios/rol`, datos);
+  }
+
+  // ── Auditoría ──────────────────────────────────
+
+  // El backend regresa los accesos paginados de 20 en 20.
+  obtenerAuditoriaAccesos(page: number = 1): Observable<AuditoriaAccesosResponse> {
+    const params = new HttpParams().set('page', page);
+    return this.http.get<AuditoriaAccesosResponse>(
+      `${this.API_URL}/admin/guardia/auditoria-accesos`,
+      { params },
+    );
+  }
+
+  exportarAuditoriaAccesosExcel(): Observable<Blob> {
+    return this.http.get(`${this.API_URL}/admin/guardia/auditoria-accesos/excel`, {
+      responseType: 'blob',
+    });
+  }
+
+  exportarAuditoriaSolicitudesExcel(): Observable<Blob> {
+    return this.http.get(`${this.API_URL}/admin/auditoria/solicitudes/excel`, {
+      responseType: 'blob',
+    });
+  }
+
+  // ── Apelaciones de bloqueo (alumno con 3 strikes) ──
+
+  consultarEvidenciasApelacion(numeroCuenta: string): Observable<HistorialAccesosDenegadosResponse> {
+    return this.http.get<HistorialAccesosDenegadosResponse>(
+      `${this.API_URL}/admin/auditoria/evidencia-accesos-denegados/${numeroCuenta}`,
+    );
+  }
+
+  // La propia <img>/<iframe> hace el GET directamente, no pasa por HttpClient.
+  obtenerUrlEvidenciaAcceso(idAcceso: number): string {
+    return `${this.API_URL}/admin/auditoria/accesos/${idAcceso}/evidencia/visualizar`;
+  }
+
+  desbloquearAccesoAlumno(
+    numeroCuenta: string,
+    datos: DesbloquearAccesoPayload,
+  ): Observable<DesbloquearAccesoResponse> {
+    return this.http.put<DesbloquearAccesoResponse>(
+      `${this.API_URL}/admin/usuarios/${numeroCuenta}/desbloquear-acceso`,
+      datos,
+    );
   }
 
   // ── Inventario ───────────────────────────────
@@ -107,6 +164,12 @@ export class AdminService {
 
   actualizarLocker(idLocker: number, datos: ActualizarLockerPayload): Observable<any> {
     return this.http.put(`${this.API_URL}/admin/lockers/${idLocker}`, datos);
+  }
+
+  // Reactiva un locker en MANTENIMIENTO. id_admin va como query param, igual que en-revision.
+  darAltaLocker(idLocker: number, idAdmin: number): Observable<any> {
+    const params = new HttpParams().set('id_admin', idAdmin);
+    return this.http.patch(`${this.API_URL}/admin/lockers/${idLocker}/alta`, null, { params });
   }
 
   darBajaLocker(idLocker: number, datos: BajaLockerPayload): Observable<any> {

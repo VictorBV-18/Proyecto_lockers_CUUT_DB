@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
+import { NotificacionService } from '../../core/service/notificacion-service';
 
 interface MenuItem {
   label: string;
@@ -29,7 +30,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: 'Crear Cuentas',     route: '/home/crear-cuentas',   icon: 'user-plus'     },
     { label: 'Permisos y Roles',  route: '/home/permisos-roles',  icon: 'shield'        },
     { label: 'Configuración',     route: '/home/configuracion',   icon: 'settings',   disabled: true },
-    { label: 'Auditoría',         route: '/home/auditoria',       icon: 'clipboard',  disabled: true },
+    { label: 'Auditoría',         route: '/home/auditoria',       icon: 'clipboard'     },
   ],
   vigilante: [
     { label: 'Verificar Accesos', route: '/home/verificacion',    icon: 'check-circle'  },
@@ -56,7 +57,10 @@ export class Layout implements OnInit {
   userRole     = '';
   userInitials = '';
 
-  constructor(private router: Router) {}
+  constructor(
+    private router: Router,
+    public notificacionService: NotificacionService,
+  ) {}
 
   ngOnInit() {
     this.userAccount = localStorage.getItem('numeroCuenta') || '';
@@ -80,7 +84,21 @@ export class Layout implements OnInit {
 
     this.router.events
       .pipe(filter(e => e instanceof NavigationEnd))
-      .subscribe((e: any) => { this.currentRoute = e.urlAfterRedirects; });
+      .subscribe((e: any) => {
+        this.currentRoute = e.urlAfterRedirects;
+        this.cargarContadorNotificaciones();
+      });
+
+    this.cargarContadorNotificaciones();
+  }
+
+  private cargarContadorNotificaciones(): void {
+    if (!this.userAccount || !this.menuItems.some(item => item.route === '/home/notificaciones')) {
+      return;
+    }
+    this.notificacionService.contarNoLeidas(this.userAccount, this.userRole).subscribe({
+      error: () => {},
+    });
   }
 
   isActive(route: string): boolean {
@@ -122,4 +140,14 @@ export class Layout implements OnInit {
     };
     return icons[name] || '';
   }
+  
+  sidebarOpen = false;
+
+toggleSidebar(): void {
+  this.sidebarOpen = !this.sidebarOpen;
+}
+
+closeSidebar(): void {
+  this.sidebarOpen = false;
+}
 }

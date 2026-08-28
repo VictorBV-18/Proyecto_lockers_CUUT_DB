@@ -50,6 +50,28 @@
   color: var(--text-soft);
 }
 
+.btn-exportar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 18px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-field);
+  background: var(--white);
+  color: var(--text-soft);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn-exportar svg { width: 16px; height: 16px; }
+.btn-exportar:hover:not(:disabled) { border-color: var(--primary-dark); color: var(--primary-dark); }
+.btn-exportar:disabled { opacity: 0.6; cursor: not-allowed; }
+
 /* ---------- Panel de tabla ---------- */
 .panel {
   background: var(--bg-tint);
@@ -846,9 +868,8 @@
   background: #fff;
   border-radius: 14px;
   width: 100%;
-  max-width: 720px;
-  max-height: 85vh;
-  display: flex;
+  max-width: 920px;
+  max-height: 95vh; display: flex;
   flex-direction: column;
   overflow: hidden;
   box-shadow: 0 20px 50px -12px rgba(8, 44, 28, 0.45);
@@ -878,16 +899,17 @@
   justify-content: center;
   padding: 1rem;
   overflow: auto;
+  width: 100%;
 }
 .preview-body img {
   max-width: 100%;
-  max-height: 70vh;
+  max-height: 80vh;
   border-radius: 8px;
   object-fit: contain;
 }
 .preview-body iframe {
   width: 100%;
-  height: 70vh;
+  height: 80vh;
   border: none;
   border-radius: 8px;
   background: #fff;

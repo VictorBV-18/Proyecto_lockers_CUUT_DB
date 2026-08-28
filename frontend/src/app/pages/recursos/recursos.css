@@ -119,6 +119,13 @@
 .btn--outline-danger:hover { background: rgba(214,69,69,0.06); }
 .btn--outline-danger:disabled { opacity: 0.4; cursor: not-allowed; }
 
+.btn--outline-success {
+  background: none;
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+.btn--outline-success:hover { background: rgba(42,157,143,0.08); }
+
 /* ── Table ──────────────────────────────── */
 .table-card {
   background: #fff;

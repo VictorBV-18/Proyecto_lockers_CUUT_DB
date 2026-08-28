@@ -1,7 +1,6 @@
-import { Component, OnDestroy } from '@angular/core';
+import { Component, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 import {
-  SolicitudResumen,
   NuevaSolicitudPayload,
   TipoSolicitudApi,
   DocumentoRequerido,
@@ -11,12 +10,18 @@ import Swal from 'sweetalert2';
 import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
 
-const ESTADOS_ACTIVOS = ['PENDIENTE', 'EN_REVISION', 'APROBADA', 'DATOS_INCOMPLETOS'];
+const ESTADOS_ACTIVOS = [
+  'PENDIENTE',
+  'EN_REVISION',
+  'APROBADA',
+  'DOCUMENTACION_INCORRECTA',
+  'REPOSICION',
+];
 
-// Estados de una solicitud que aún no ha sido validada (aprobada). Mientras
-// exista una solicitud de OTRO trámite en alguno de estos estados, no se
-// puede iniciar una nueva solicitud del trámite contrario.
-const ESTADOS_SIN_VALIDAR = ['PENDIENTE', 'EN_REVISION', 'DATOS_INCOMPLETOS'];
+// El backend permite hasta 3 solicitudes de estacionamiento activas o en
+// proceso por alumno (una por vehículo); cada una exige su propio juego de
+// documentos. El locker, en cambio, sigue limitado a 1 por alumno.
+const MAX_ESTACIONAMIENTOS_ACTIVOS = 3;
 
 type TipoSolicitud = '' | TipoSolicitudApi;
 
@@ -81,6 +86,7 @@ export class NuevaSolicitud implements OnDestroy {
     private solicitudService: SolicitudService,
     private router: Router,
     private sanitizer: DomSanitizer,
+    private cdr: ChangeDetectorRef,
   ) {}
 
   ngOnInit(): void {
@@ -91,30 +97,22 @@ export class NuevaSolicitud implements OnDestroy {
     this.revocarTodasLasPreviews();
   }
 
-  get hayEstacionamientoActiva(): boolean {
+  get estacionamientosActivosCount(): number {
     return this.solicitudService
       .misTramites()
-      .some((s) => s.tipo_tramite === 'estacionamiento' && ESTADOS_ACTIVOS.includes(s.estado_solicitud));
+      .filter(
+        (s) => s.tipo_tramite === 'estacionamiento' && ESTADOS_ACTIVOS.includes(s.estado_solicitud),
+      ).length;
+  }
+
+  get hayEstacionamientoActiva(): boolean {
+    return this.estacionamientosActivosCount >= MAX_ESTACIONAMIENTOS_ACTIVOS;
   }
 
   get hayLockerActivo(): boolean {
     return this.solicitudService
       .misTramites()
       .some((s) => s.tipo_tramite === 'locker' && ESTADOS_ACTIVOS.includes(s.estado_solicitud));
-  }
-
-  // Bloquea "estacionamiento" si hay una solicitud de locker sin validar todavía.
-  get hayLockerSinValidar(): boolean {
-    return this.solicitudService
-      .misTramites()
-      .some((s) => s.tipo_tramite === 'locker' && ESTADOS_SIN_VALIDAR.includes(s.estado_solicitud));
-  }
-
-  // Bloquea "locker" si hay una solicitud de estacionamiento sin validar todavía.
-  get hayEstacionamientoSinValidar(): boolean {
-    return this.solicitudService
-      .misTramites()
-      .some((s) => s.tipo_tramite === 'estacionamiento' && ESTADOS_SIN_VALIDAR.includes(s.estado_solicitud));
   }
 
   onTipoChange(): void {
@@ -130,22 +128,6 @@ export class NuevaSolicitud implements OnDestroy {
     }
 
     const tipoSeleccionado = this.tipoSolicitud;
-
-    if (tipoSeleccionado === 'estacionamiento' && this.hayLockerSinValidar) {
-      this.solicitudService.peticionError(
-        'Ya tienes una solicitud de locker sin validar. Espera a que sea validada antes de solicitar estacionamiento.',
-      );
-      this.tipoSolicitud = '';
-      return;
-    }
-
-    if (tipoSeleccionado === 'locker' && this.hayEstacionamientoSinValidar) {
-      this.solicitudService.peticionError(
-        'Ya tienes una solicitud de estacionamiento sin validar. Espera a que sea validada antes de solicitar locker.',
-      );
-      this.tipoSolicitud = '';
-      return;
-    }
 
     Swal.fire({
       title: `¿Estás seguro que quieres iniciar una solicitud de ${tipoSeleccionado}?`,
@@ -184,9 +166,11 @@ export class NuevaSolicitud implements OnDestroy {
       next: (response) => {
         this.idSolicitudActual = response.id_solicitud;
         this.documentos = this.construirDocumentos(tipo);
+        this.cdr.detectChanges();
       },
       error: () => {
         this.tipoSolicitud = '';
+        this.cdr.detectChanges();
       },
     });
   }
@@ -294,16 +278,6 @@ export class NuevaSolicitud implements OnDestroy {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-  }
-
-  getEstadoLabel(estado: SolicitudResumen['estado']): string {
-    const labels: Record<SolicitudResumen['estado'], string> = {
-      en_revision: 'En revisión',
-      aprobada: 'Aprobada',
-      rechazada: 'Rechazada',
-      pendiente: 'Pendiente',
-    };
-    return labels[estado];
   }
 
   getDocIcon(id: string): string {

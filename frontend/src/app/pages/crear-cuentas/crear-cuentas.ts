@@ -5,6 +5,7 @@ import {
   CARRERAS_VALIDAS,
   CrearAlumnoPayload,
   CrearPersonalPayload,
+  CrearGuardiaPayload,
   TipoCuentaNueva,
 } from '../../../core/interfaces/admin-interfaces';
 
@@ -66,15 +67,22 @@ export class CrearCuentas {
     navigator.clipboard?.writeText(this.contrasenaGenerada);
   }
 
+  // El guardia se crea con cuenta y contraseña autogeneradas en el backend, por lo
+  // que su correo es la única forma de entregarle las credenciales.
+  esGuardia(): boolean {
+    return this.tipoCuenta === 'VIGILANTE';
+  }
+
   correoRequerido(): boolean {
-    return this.tipoCuenta !== 'VIGILANTE';
+    return this.tipoCuenta !== 'ADMIN' && this.tipoCuenta !== 'REVISOR';
   }
 
   formularioValido(): boolean {
-    if (!this.numeroCuenta.trim() || !this.nombre.trim() || !this.apellidos.trim()) {
-      return false;
-    }
+    if (!this.nombre.trim() || !this.apellidos.trim()) return false;
     if (this.correoRequerido() && !this.correo.trim()) return false;
+    if (this.esGuardia()) return true;
+
+    if (!this.numeroCuenta.trim()) return false;
     if (!this.contrasenaGenerada) return false;
     if (this.tipoCuenta === 'ALUMNO' && !this.carrera.trim()) return false;
     return true;
@@ -110,6 +118,19 @@ export class CrearCuentas {
 
     this.enviando = true;
 
+    if (this.esGuardia()) {
+      const payload: CrearGuardiaPayload = {
+        nombre: this.nombre.trim(),
+        apellidos: this.apellidos.trim(),
+        correo_electronico: correo,
+      };
+      this.adminService.crearCuentaGuardia(payload).subscribe({
+        next: (resp) => this.onCuentaCreada(resp.numero_cuenta_generado),
+        error: (err) => this.onErrorCrear(err),
+      });
+      return;
+    }
+
     if (this.tipoCuenta === 'ALUMNO') {
       const payload: CrearAlumnoPayload = {
         numero_cuenta: this.numeroCuenta.trim(),
@@ -140,13 +161,15 @@ export class CrearCuentas {
     });
   }
 
-  private onCuentaCreada() {
+  private onCuentaCreada(numeroCuentaGenerado?: string) {
     this.enviando = false;
     Swal.fire({
       icon: 'success',
       title: `Cuenta creada para ${this.nombre.trim()} ${this.apellidos.trim()}`,
-      text: 'Comparte la contraseña generada, no se mostrará de nuevo.',
-      timer: 2500,
+      text: numeroCuentaGenerado
+        ? `Número de cuenta asignado: ${numeroCuentaGenerado}. Las credenciales se enviaron a su correo.`
+        : 'Comparte la contraseña generada, no se mostrará de nuevo.',
+      timer: 3000,
       showConfirmButton: false,
     });
     this.resetFormulario();

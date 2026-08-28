@@ -149,6 +149,36 @@ export class Recursos implements OnInit {
     }
   }
 
+  // ── Reactivar (dar de alta) ───────────────
+  confirmarAlta(locker: LockerItem) {
+    Swal.fire({
+      icon: 'question',
+      title: `¿Reactivar el locker ${locker.codigo_locker}?`,
+      text: 'Volverá a estar DISPONIBLE para asignarse.',
+      showCancelButton: true,
+      confirmButtonText: 'Reactivar',
+      cancelButtonText: 'Cancelar',
+    }).then((resultado) => {
+      if (!resultado.isConfirmed) return;
+
+      this.adminService.darAltaLocker(locker.id_locker, this.idAdmin).subscribe({
+        next: () => {
+          this.cargarDatos();
+          Swal.fire({ icon: 'success', title: 'Locker reactivado', timer: 1800, showConfirmButton: false });
+        },
+        error: (err) => {
+          Swal.fire({
+            icon: 'error',
+            title: err?.error?.detail || 'No se pudo reactivar el locker.',
+            timer: 3000,
+            showConfirmButton: false,
+          });
+          this.cdr.detectChanges();
+        },
+      });
+    });
+  }
+
   // ── Modal Baja / Mantenimiento ────────────
   abrirModalBaja(locker: LockerItem, accion: string) {
     this.lockerBaja = locker;

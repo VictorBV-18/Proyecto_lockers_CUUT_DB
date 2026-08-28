@@ -24,8 +24,12 @@
   <h3 class="card-title">Datos de la cuenta</h3>
   <p class="card-desc">Los campos marcados con * son obligatorios.</p>
 
+  <p class="card-desc" *ngIf="esGuardia()">
+    El número de cuenta y la contraseña se generan automáticamente y se envían por correo.
+  </p>
+
   <div class="form-grid">
-    <div class="form-field">
+    <div class="form-field" *ngIf="!esGuardia()">
       <label class="field-label">Número de cuenta *</label>
       <input type="text" class="field-input" [(ngModel)]="numeroCuenta" placeholder="Ej. 1234567" />
     </div>
@@ -58,7 +62,7 @@
       </select>
     </div>
 
-    <div class="form-field form-field--password">
+    <div class="form-field form-field--password" *ngIf="!esGuardia()">
       <label class="field-label">Contraseña generada *</label>
       <div class="password-row">
         <input

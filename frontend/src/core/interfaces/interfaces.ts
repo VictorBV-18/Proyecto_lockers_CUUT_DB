@@ -1,7 +1,16 @@
 import { SafeResourceUrl } from '@angular/platform-browser';
 
 export type TipoSolicitudApi   = 'estacionamiento' | 'locker';
-export type EstadoSolicitudApi = 'en_revision' | 'aprobada' | 'rechazada' | 'pendiente';
+export type EstadoSolicitudApi =
+  | 'DATOS_INCOMPLETOS'
+  | 'PENDIENTE'
+  | 'EN_REVISION'
+  | 'APROBADA'
+  | 'DOCUMENTACION_INCORRECTA'
+  | 'REPOSICION'
+  | 'RECHAZADA'
+  | 'VENCIDA'
+  | 'FINALIZADA';
 export type TipoDocumento = [
   {id:1 , nombre : "Credencial Escolar"},
   {id:2 , nombre: "Tira de Materias"},
@@ -47,24 +56,6 @@ export interface FinalizarSolicitudResponse {
   nuevo_estado: string
 }
 
-export interface SolicitudResumen {
-  id_solicitud:     string;
-  tipo_tramite:   string;
-  folio:  string;
-  fecha_solicitud:  string;
-  estado: EstadoSolicitudApi;
-  observacion_alumno:string
-}
-
-export interface SolicitudDetalle {
-  id_solicitud: string,
-  tipo_tramite: string,
-  archivo_path:string,
-  fecha_subida: string,
-  estado: EstadoSolicitudApi,
-  comentario: string,
-}
-
 export interface DocumentoRequerido {
   id: string;
   idTipoDocumento: number;
@@ -81,7 +72,7 @@ export interface MiSolicitudResponse {
 }
 
 export interface SolicitudesEstudiante{
-  estado_solicitud: string
+  estado_solicitud: EstadoSolicitudApi
   fecha_solicitud: string
   folio: string
   id_solicitud: string
@@ -101,7 +92,7 @@ export interface SolicitudDetallada {
   id_solicitud: string;
   folio: string;
   tipo_tramite: string;
-  estado_solicitud: string;
+  estado_solicitud: EstadoSolicitudApi;
   documentos_tramite: DocumentoDetalle[];
 }
 
@@ -126,34 +117,38 @@ export interface NotificacionesResponse {
   resultados: Notificacion[];
 }
 
+export interface ContadorNoLeidasResponse {
+  no_leidas: number;
+}
+
 export interface DocumentoRecursoActivo {
   folio: string;
   qr_token: string;
   vigencia: string;
   estado: string;
   url_descarga: string;
-  documento_path: string | null;
 }
 
 export interface DetalleRecurso {
-  placas?: string;
-  modelo?: string;
-  color?: string;
   codigo_locker?: string;
   ubicacion?: string;
+  vehiculo?: {
+    placas: string;
+    modelo: string;
+    color: string;
+  };
 }
 
 export interface RecursoActivo {
   id_solicitud: number;
   tipo_tramite: TipoSolicitudApi;
+  alumno: {
+    nombre_completo: string;
+    numero_cuenta: string;
+  };
   fecha_asignacion: string;
   documento: DocumentoRecursoActivo | null;
   detalles_recurso: DetalleRecurso;
-}
-
-export interface DetallesTramiteResponse {
-  numero_cuenta: string;
-  recursos_activos: RecursoActivo[];
 }
 
 export interface CambiarContrasenaPayload {
@@ -165,11 +160,17 @@ export interface CambiarContrasenaResponse {
   mensaje: string;
 }
 
+export interface VehiculoRegistrado {
+  placas: string;
+  modelo: string;
+  color: string;
+}
+
 export interface PerfilAlumnoResponse {
   numero_cuenta: string;
-  'nombre (s)': string;
-  apellidos: string;
+  nombre_completo: string;
   carrera: string;
   correo_electronico: string;
   estado_activo: boolean;
+  vehiculos_registrados: VehiculoRegistrado[];
 }
