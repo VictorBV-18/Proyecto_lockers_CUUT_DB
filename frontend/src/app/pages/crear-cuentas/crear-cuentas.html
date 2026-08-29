@@ -27,6 +27,9 @@
   <p class="card-desc" *ngIf="esGuardia()">
     El número de cuenta y la contraseña se generan automáticamente y se envían por correo.
   </p>
+  <p class="card-desc" *ngIf="tipoCuenta === 'ALUMNO'">
+    La contraseña se genera automáticamente y se envía por correo electrónico.
+  </p>
 
   <div class="form-grid">
     <div class="form-field" *ngIf="!esGuardia()">
@@ -62,7 +65,7 @@
       </select>
     </div>
 
-    <div class="form-field form-field--password" *ngIf="!esGuardia()">
+    <div class="form-field form-field--password" *ngIf="!passwordAutogenerada()">
       <label class="field-label">Contraseña generada *</label>
       <div class="password-row">
         <input

@@ -15,7 +15,6 @@ export class Login {
   numeroCuenta = '';
   password = '';
   mostrarPassword = false;
-  anioActual = new Date().getFullYear();
 
   constructor(private router: Router) {}
 

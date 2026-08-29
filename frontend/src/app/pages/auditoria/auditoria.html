@@ -16,12 +16,12 @@
       </svg>
       Exportar PDF
     </button>
-    <button class="aud-btn aud-btn--export-excel" [disabled]="exportando" (click)="exportarExcel()">
+    <button class="aud-btn aud-btn--export-excel" [disabled]="exportando()" (click)="exportarExcel()">
       <svg class="aud-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
       </svg>
-      {{ exportando ? 'Generando…' : 'Exportar Excel' }}
+      {{ exportando() ? 'Generando…' : 'Exportar Excel' }}
     </button>
   </div>
 </div>
@@ -98,16 +98,17 @@
           <th>Trámite</th>
           <th>Vehículo</th>
           <th>Estado</th>
+          <th>Motivo / Evidencia</th>
         </tr>
       </thead>
       <tbody>
         <!-- Estado de carga -->
-        <tr *ngIf="cargando">
-          <td colspan="6" class="aud-td-empty">Cargando registros de acceso…</td>
+        <tr *ngIf="cargando()">
+          <td colspan="7" class="aud-td-empty">Cargando registros de acceso…</td>
         </tr>
 
         <!-- Filas de datos -->
-        <tr *ngFor="let r of registrosFiltrados">
+        <tr *ngFor="let r of registrosFiltrados()">
           <td class="aud-td-fecha">{{ formatearFechaHora(r.fecha_hora) }}</td>
           <td class="aud-td-usuario">{{ r.guardia_turno }}</td>
           <td>
@@ -119,11 +120,27 @@
           <td>
             <span class="aud-badge" [ngClass]="getEstadoClase(r.estado_acceso)">{{ r.estado_acceso }}</span>
           </td>
+          <td class="aud-td-motivo">
+            <button
+              type="button"
+              class="aud-kebab-btn"
+              *ngIf="r.estado_acceso === 'DENEGADO'; else sinMotivo"
+              aria-label="Más acciones"
+              (click)="toggleMenu($event, r)"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                <circle cx="12" cy="5" r="1.8"/>
+                <circle cx="12" cy="12" r="1.8"/>
+                <circle cx="12" cy="19" r="1.8"/>
+              </svg>
+            </button>
+            <ng-template #sinMotivo>—</ng-template>
+          </td>
         </tr>
 
         <!-- Estado vacío -->
-        <tr *ngIf="!cargando && registrosFiltrados.length === 0">
-          <td colspan="6" class="aud-td-empty">
+        <tr *ngIf="!cargando() && registrosFiltrados().length === 0">
+          <td colspan="7" class="aud-td-empty">
             <div class="aud-empty-state">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
                    stroke-linecap="round" stroke-linejoin="round" class="aud-empty-icon">
@@ -143,7 +160,7 @@
 
   <!-- Pie de tabla con contador -->
   <div class="aud-table-footer">
-    <span class="aud-count">{{ registrosFiltrados.length }} registros encontrados</span>
+    <span class="aud-count">{{ registrosFiltrados().length }} registros encontrados</span>
     <span class="aud-readonly-tag">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
@@ -151,5 +168,54 @@
       </svg>
       Registro inmutable
     </span>
+  </div>
+</div>
+
+<!-- Menú contextual (3 puntos) -->
+<div
+  class="aud-kebab-menu"
+  *ngIf="menuAbierto() as menu"
+  [style.top.px]="menu.top"
+  [style.left.px]="menu.left"
+  (click)="$event.stopPropagation()"
+>
+  <button
+    type="button"
+    class="aud-kebab-menu__item"
+    (click)="abrirDetalle(menu.registro)"
+  >
+    Ver motivo y evidencia
+  </button>
+</div>
+
+<!-- Card de detalle: motivo y evidencia -->
+<div class="aud-modal-overlay" *ngIf="registroDetalle() as det" (click)="cerrarDetalle()">
+  <div class="aud-modal-content" (click)="$event.stopPropagation()">
+    <div class="aud-modal-header">
+      <h3 class="aud-modal-title">Motivo y evidencia</h3>
+      <button class="aud-modal-close" (click)="cerrarDetalle()">&times;</button>
+    </div>
+    <div class="aud-modal-body">
+      <div class="aud-detalle-row"><span>Nombre</span><strong>{{ det.alumno.nombre }}</strong></div>
+      <div class="aud-detalle-row"><span>Vehículo</span><strong>{{ det.vehiculo.placas }} · {{ det.vehiculo.modelo }}</strong></div>
+
+      <div class="aud-detalle-block">
+        <span class="aud-detalle-label">Evidencia — Mensaje</span>
+        <p class="aud-detalle-mensaje">{{ det.motivo || 'Sin motivo registrado.' }}</p>
+      </div>
+
+      <div class="aud-detalle-block">
+        <span class="aud-detalle-label">Evidencia — Fotografía</span>
+        <img
+          *ngIf="det.evidencia; else sinFoto"
+          [src]="urlEvidencia(det.id_acceso)"
+          alt="Evidencia del acceso denegado"
+          class="aud-evidencia-img"
+        />
+        <ng-template #sinFoto>
+          <p class="aud-detalle-sinfoto">No se subió evidencia fotográfica para este registro.</p>
+        </ng-template>
+      </div>
+    </div>
   </div>
 </div>

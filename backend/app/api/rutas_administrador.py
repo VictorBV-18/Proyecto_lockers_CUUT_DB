@@ -997,7 +997,9 @@ def ver_auditoria_accesos(page: int = 1):
                 al.nombre || ' ' || al.apellidos AS nombre_alumno,
                 s.tipo_tramite,
                 v.placas,
-                v.modelo
+                v.modelo,
+                au.motivo,
+                au.evidencia_path
             FROM auditoria_acceso au
             JOIN admin g ON au.id_guardia = g.id_admin
             JOIN asignacion ag ON au.id_asignacion = ag.id_asignacion
@@ -1029,7 +1031,9 @@ def ver_auditoria_accesos(page: int = 1):
                 "vehiculo": {
                     "placas": fila[8] if fila[8] else "N/A",
                     "modelo": fila[9] if fila[9] else "N/A"
-                }
+                },
+                "motivo": fila[10],
+                "evidencia": fila[11]
             })
 
         cursor.close()
