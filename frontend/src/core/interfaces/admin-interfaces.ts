@@ -172,6 +172,8 @@ export interface RegistroAccesoAuditoria {
     placas: string;
     modelo: string;
   };
+  motivo: string | null;
+  evidencia: string | null;
 }
 
 export interface AuditoriaAccesosResponse {
@@ -209,7 +211,6 @@ export interface CrearAlumnoPayload {
   nombre: string;
   apellidos: string;
   correo_electronico: string;
-  contrasena: string;
   carrera: string;
 }
 

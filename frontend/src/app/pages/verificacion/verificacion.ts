@@ -48,7 +48,12 @@ export class Verificacion implements OnDestroy {
   ) {}
 
   async iniciarEscaneo() {
-    if (this.estado !== 'idle') return;
+    // Solo bloquea reentradas mientras la cámara ya está activa o hay un
+    // escaneo en curso; debe poder relanzarse desde 'idle' y desde 'resultado'
+    // (botón "Escanear siguiente").
+    if (this.estado === 'escaneando' || this.estado === 'procesando' || this.estado === 'confirmando') {
+      return;
+    }
 
     this.errorCamara = '';
     this.mensajeError = '';

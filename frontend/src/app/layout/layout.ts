@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { NotificacionService } from '../../core/service/notificacion-service';
+import Swal from 'sweetalert2';
 
 interface MenuItem {
   label: string;
@@ -111,9 +112,30 @@ export class Layout implements OnInit {
   }
 
   logout() {
-    localStorage.removeItem('numeroCuenta');
-    localStorage.removeItem('rolUsuario');
-    this.router.navigate(['/login']);
+    Swal.fire({
+      title: 'Cerrando sesión…',
+      text: 'Un momento por favor.',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => Swal.showLoading(),
+    });
+
+    setTimeout(() => {
+      localStorage.removeItem('numeroCuenta');
+      localStorage.removeItem('rolUsuario');
+      localStorage.removeItem('idAdmin');
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Sesión cerrada',
+        text: '¡Vuelve pronto!',
+        timer: 1800,
+        showConfirmButton: false,
+      }).then(() => {
+        this.router.navigate(['/login']);
+      });
+    }, 900);
   }
 
   getRoleLabel(): string {

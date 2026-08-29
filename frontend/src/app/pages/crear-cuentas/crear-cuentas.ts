@@ -52,13 +52,31 @@ export class CrearCuentas {
     if (tipo !== 'ALUMNO') this.carrera = '';
   }
 
+  // Genera una contraseña de 6 a 12 caracteres que siempre incluye al menos
+  // un número y un carácter especial, para que sea más difícil de adivinar.
   generarContrasena() {
-    const caracteres = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-    let resultado = '';
-    for (let i = 0; i < 10; i++) {
-      resultado += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+    const letras = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz';
+    const numeros = '23456789';
+    const especiales = '!@#$%&*';
+    const todos = letras + numeros + especiales;
+
+    const longitud = Math.floor(Math.random() * (12 - 6 + 1)) + 6;
+
+    const caracteres = [
+      numeros.charAt(Math.floor(Math.random() * numeros.length)),
+      especiales.charAt(Math.floor(Math.random() * especiales.length)),
+    ];
+    for (let i = caracteres.length; i < longitud; i++) {
+      caracteres.push(todos.charAt(Math.floor(Math.random() * todos.length)));
     }
-    this.contrasenaGenerada = resultado;
+
+    // Fisher-Yates: evita que el número y el carácter especial queden siempre al inicio.
+    for (let i = caracteres.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [caracteres[i], caracteres[j]] = [caracteres[j], caracteres[i]];
+    }
+
+    this.contrasenaGenerada = caracteres.join('');
     this.mostrarContrasena = true;
   }
 
@@ -73,6 +91,12 @@ export class CrearCuentas {
     return this.tipoCuenta === 'VIGILANTE';
   }
 
+  // Alumno y Guardia reciben una contraseña generada por el backend y enviada
+  // por correo; el formulario no debe pedirla ni mostrarla.
+  passwordAutogenerada(): boolean {
+    return this.tipoCuenta === 'ALUMNO' || this.tipoCuenta === 'VIGILANTE';
+  }
+
   correoRequerido(): boolean {
     return this.tipoCuenta !== 'ADMIN' && this.tipoCuenta !== 'REVISOR';
   }
@@ -80,10 +104,8 @@ export class CrearCuentas {
   formularioValido(): boolean {
     if (!this.nombre.trim() || !this.apellidos.trim()) return false;
     if (this.correoRequerido() && !this.correo.trim()) return false;
-    if (this.esGuardia()) return true;
-
-    if (!this.numeroCuenta.trim()) return false;
-    if (!this.contrasenaGenerada) return false;
+    if (!this.esGuardia() && !this.numeroCuenta.trim()) return false;
+    if (!this.passwordAutogenerada() && !this.contrasenaGenerada) return false;
     if (this.tipoCuenta === 'ALUMNO' && !this.carrera.trim()) return false;
     return true;
   }
@@ -97,7 +119,7 @@ export class CrearCuentas {
     if (!this.formularioValido()) {
       Swal.fire({
         icon: 'warning',
-        title: 'Completa todos los campos requeridos y genera una contraseña.',
+        title: 'Completa todos los campos requeridos.',
         timer: 2500,
         showConfirmButton: false,
       });
@@ -137,7 +159,6 @@ export class CrearCuentas {
         nombre: this.nombre.trim(),
         apellidos: this.apellidos.trim(),
         correo_electronico: correo,
-        contrasena: this.contrasenaGenerada,
         carrera: this.carrera,
       };
       this.adminService.crearCuentaAlumno(payload).subscribe({
@@ -163,12 +184,20 @@ export class CrearCuentas {
 
   private onCuentaCreada(numeroCuentaGenerado?: string) {
     this.enviando = false;
+
+    let text: string;
+    if (numeroCuentaGenerado) {
+      text = `Número de cuenta asignado: ${numeroCuentaGenerado}. Las credenciales se enviaron a su correo.`;
+    } else if (this.passwordAutogenerada()) {
+      text = 'La contraseña se generó automáticamente y se envió a su correo electrónico.';
+    } else {
+      text = 'Comparte la contraseña generada, no se mostrará de nuevo.';
+    }
+
     Swal.fire({
       icon: 'success',
       title: `Cuenta creada para ${this.nombre.trim()} ${this.apellidos.trim()}`,
-      text: numeroCuentaGenerado
-        ? `Número de cuenta asignado: ${numeroCuentaGenerado}. Las credenciales se enviaron a su correo.`
-        : 'Comparte la contraseña generada, no se mostrará de nuevo.',
+      text,
       timer: 3000,
       showConfirmButton: false,
     });

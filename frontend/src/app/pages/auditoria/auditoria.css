@@ -202,6 +202,20 @@
   font-size: 0.83rem;
   max-width: 360px;
 }
+.aud-td-motivo {
+  text-align: center;
+}
+
+.aud-kebab-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 0.3rem;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+}
+.aud-kebab-btn:hover { background: var(--field-bg); color: var(--text); }
 
 /* Badges */
 .aud-badge {
@@ -279,4 +293,97 @@
   .aud-page-header  { flex-direction: column; align-items: flex-start; }
   .aud-filters-row  { flex-direction: column; }
   .aud-filter-group { min-width: 100%; }
+}
+
+/* ── Modal de evidencia fotográfica ──────── */
+.aud-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.aud-modal-content {
+  background: #fff;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 480px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
+}
+
+.aud-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem 1.4rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+.aud-modal-title { font-size: 1.02rem; font-weight: 700; }
+.aud-modal-close { background: none; border: none; font-size: 1.5rem; color: var(--text-muted); cursor: pointer; }
+
+.aud-modal-body { padding: 1.25rem 1.4rem; }
+.aud-evidencia-img { width: 100%; border-radius: 10px; display: block; }
+
+/* ── Menú contextual (3 puntos) ───────────── */
+.aud-kebab-menu {
+  position: fixed;
+  z-index: 1100;
+  width: 200px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.aud-kebab-menu__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.65rem 0.9rem;
+  background: none;
+  border: none;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+}
+.aud-kebab-menu__item:hover { background: var(--field-bg); }
+
+/* ── Card de detalle: motivo y evidencia ──── */
+.aud-detalle-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  font-size: 0.88rem;
+  border-bottom: 1px solid var(--line);
+}
+.aud-detalle-row span   { color: var(--text-muted); }
+.aud-detalle-row strong { color: var(--text); text-align: right; }
+
+.aud-detalle-block { margin-top: 1rem; }
+.aud-detalle-label {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+}
+.aud-detalle-mensaje {
+  font-size: 0.88rem;
+  color: var(--text);
+  background: var(--field-bg);
+  border-radius: var(--radius-field);
+  padding: 0.65rem 0.85rem;
+  margin: 0;
+}
+.aud-detalle-sinfoto {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0;
 }
