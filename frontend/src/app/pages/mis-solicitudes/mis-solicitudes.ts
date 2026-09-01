@@ -1,7 +1,8 @@
 import { ChangeDetectorRef, Component, OnDestroy, inject } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { Router } from '@angular/router';
 import { SolicitudService } from '../../../core/service/solicitud-service';
-import { SolicitudesEstudiante, SolicitudDetallada } from '../../../core/interfaces/interfaces';
+import { SolicitudesEstudiante, SolicitudDetallada, RecursoActivo } from '../../../core/interfaces/interfaces';
 import { formatearFecha, claseEstado } from '../../../helpers/helpers';
 
 interface DocumentoStaged {
@@ -44,6 +45,7 @@ export class MisSolicitudes implements OnDestroy {
   solicitudesUsuario = inject(SolicitudService);
   private cdr = inject(ChangeDetectorRef);
   private sanitizer = inject(DomSanitizer);
+  private router = inject(Router);
   numeroCuenta = localStorage.getItem("numeroCuenta") || '';
 
   modalAbierto = false;
@@ -51,6 +53,10 @@ export class MisSolicitudes implements OnDestroy {
   cargandoModal = false;
   subiendoDocumento: Record<number, boolean> = {};
   private detallesCache: SolicitudDetallada[] | null = null;
+
+  modalRecursoAbierto = false;
+  cargandoRecurso = false;
+  recursoActivo: RecursoActivo | null = null;
 
   // Archivos seleccionados pero aún no confirmados/subidos, para poder
   // mostrar una vista previa antes de enviarlos al backend.
@@ -106,6 +112,35 @@ export class MisSolicitudes implements OnDestroy {
     this.modalAbierto = false;
     this.solicitudSeleccionada = null;
     this.subiendoDocumento = {};
+  }
+
+  irANuevaSolicitud(): void {
+    this.cerrarModal();
+    this.router.navigate(['/home/nueva-solicitud']);
+  }
+
+  verDetallesRecurso(sol: SolicitudesEstudiante): void {
+    this.modalRecursoAbierto = true;
+    this.cargandoRecurso = true;
+    this.recursoActivo = null;
+
+    this.solicitudesUsuario.obtenerRecursoActivo(Number(sol.id_solicitud)).subscribe({
+      next: (response) => {
+        this.recursoActivo = response;
+        this.cargandoRecurso = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.cargandoRecurso = false;
+        this.modalRecursoAbierto = false;
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  cerrarModalRecurso(): void {
+    this.modalRecursoAbierto = false;
+    this.recursoActivo = null;
   }
 
   getNombreDocumento(idTipo: number): string {

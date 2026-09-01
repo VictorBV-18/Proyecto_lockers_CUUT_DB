@@ -81,7 +81,8 @@
   color: var(--text-soft);
   border: 1px solid var(--field-line);
 }
-.btn--outline:hover { background: var(--field-bg); }
+.btn--outline:hover:not(:disabled) { background: var(--field-bg); }
+.btn--outline:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .btn--danger-outline {
   background: none;
@@ -117,6 +118,13 @@
 }
 .btn--outline-danger:hover { background: rgba(214,69,69,0.06); }
 .btn--outline-danger:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn--outline-success {
+  background: none;
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+.btn--outline-success:hover { background: rgba(42,157,143,0.08); }
 
 /* ── Table ──────────────────────────────── */
 .table-card {
@@ -220,14 +228,6 @@
 .modal-body { padding: 1.25rem 1.5rem; }
 
 .modal-text { font-size: 0.88rem; color: var(--text-soft); margin-bottom: 1rem; }
-
-.modal-warning {
-  font-size: 0.82rem;
-  color: var(--secondary);
-  background: rgba(201,162,39,0.08);
-  padding: 0.75rem;
-  border-radius: 8px;
-}
 
 .field-label {
   display: block;

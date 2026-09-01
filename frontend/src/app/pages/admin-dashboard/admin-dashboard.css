@@ -61,33 +61,6 @@
   margin-top: 0.15rem;
 }
 
-/* ── Charts Grid ───────────────────────── */
-.charts-grid {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
-
-.chart-card {
-  background: #fff;
-  border-radius: 14px;
-  padding: 1.25rem;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-}
-
-.chart-title {
-  font-size: 0.92rem;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 0.75rem;
-}
-
-.chart-container {
-  position: relative;
-  height: 260px;
-}
-
 /* ── Section Header ────────────────────── */
 .section-header {
   margin-bottom: 1rem;
@@ -113,10 +86,6 @@
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   border: 2px solid transparent;
   transition: border-color 0.2s ease;
-}
-
-.inventory-card--alert {
-  border-color: var(--danger);
 }
 
 .inventory-header {
@@ -181,10 +150,6 @@
   transition: width 0.5s ease;
 }
 
-.bar-fill--danger {
-  background: var(--danger);
-}
-
 .inventory-bar-label {
   display: flex;
   justify-content: space-between;
@@ -193,15 +158,8 @@
   color: var(--text-muted);
 }
 
-.alert-badge {
-  color: var(--danger);
-  font-weight: 600;
-  font-size: 0.72rem;
-}
-
 /* ── Responsive ────────────────────────── */
 @media (max-width: 768px) {
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-  .charts-grid { grid-template-columns: 1fr; }
   .inventory-stats { flex-wrap: wrap; gap: 1rem; }
 }

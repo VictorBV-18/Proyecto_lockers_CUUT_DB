@@ -1,4 +1,5 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import Swal from 'sweetalert2';
 import { AdminService } from '../../../core/service/admin-service';
 import { LockerItem } from '../../../core/interfaces/admin-interfaces';
 
@@ -9,6 +10,8 @@ import { LockerItem } from '../../../core/interfaces/admin-interfaces';
   styleUrl: './recursos.css',
 })
 export class Recursos implements OnInit {
+  idAdmin = Number(localStorage.getItem('idAdmin')) || 0;
+
   // Resumen
   totalLockers = 0;
   disponibles = 0;
@@ -34,8 +37,13 @@ export class Recursos implements OnInit {
 
   // Modal Liberación Masiva
   mostrarModalLiberacion = false;
+  motivoLiberacion = '';
+  liberando = false;
 
-  constructor(private adminService: AdminService) {}
+  constructor(
+    private adminService: AdminService,
+    private cdr: ChangeDetectorRef,
+  ) {}
 
   ngOnInit() {
     this.cargarDatos();
@@ -50,12 +58,16 @@ export class Recursos implements OnInit {
         this.mantenimiento = res.mantenimiento;
         this.alertaBaja = res.alerta_baja_disponibilidad;
         this.porcentajeDisponible = res.porcentaje_disponible;
+        this.cdr.detectChanges();
       },
+      error: () => this.cdr.detectChanges(),
     });
     this.adminService.listarTodosLockers().subscribe({
       next: (res) => {
         this.lockers = res.lockers;
+        this.cdr.detectChanges();
       },
+      error: () => this.cdr.detectChanges(),
     });
   }
 
@@ -99,8 +111,17 @@ export class Recursos implements OnInit {
           next: () => {
             this.cerrarModalLocker();
             this.cargarDatos();
+            Swal.fire({ icon: 'success', title: 'Locker actualizado', timer: 1800, showConfirmButton: false });
           },
-          error: (err) => console.error('Error actualizando locker:', err),
+          error: (err) => {
+            Swal.fire({
+              icon: 'error',
+              title: err?.error?.detail || 'No se pudo actualizar el locker.',
+              timer: 3000,
+              showConfirmButton: false,
+            });
+            this.cdr.detectChanges();
+          },
         });
     } else {
       this.adminService
@@ -113,10 +134,49 @@ export class Recursos implements OnInit {
           next: () => {
             this.cerrarModalLocker();
             this.cargarDatos();
+            Swal.fire({ icon: 'success', title: 'Locker creado', timer: 1800, showConfirmButton: false });
           },
-          error: (err) => console.error('Error creando locker:', err),
+          error: (err) => {
+            Swal.fire({
+              icon: 'error',
+              title: err?.error?.detail || 'No se pudo crear el locker.',
+              timer: 3000,
+              showConfirmButton: false,
+            });
+            this.cdr.detectChanges();
+          },
         });
     }
+  }
+
+  // ── Reactivar (dar de alta) ───────────────
+  confirmarAlta(locker: LockerItem) {
+    Swal.fire({
+      icon: 'question',
+      title: `¿Reactivar el locker ${locker.codigo_locker}?`,
+      text: 'Volverá a estar DISPONIBLE para asignarse.',
+      showCancelButton: true,
+      confirmButtonText: 'Reactivar',
+      cancelButtonText: 'Cancelar',
+    }).then((resultado) => {
+      if (!resultado.isConfirmed) return;
+
+      this.adminService.darAltaLocker(locker.id_locker, this.idAdmin).subscribe({
+        next: () => {
+          this.cargarDatos();
+          Swal.fire({ icon: 'success', title: 'Locker reactivado', timer: 1800, showConfirmButton: false });
+        },
+        error: (err) => {
+          Swal.fire({
+            icon: 'error',
+            title: err?.error?.detail || 'No se pudo reactivar el locker.',
+            timer: 3000,
+            showConfirmButton: false,
+          });
+          this.cdr.detectChanges();
+        },
+      });
+    });
   }
 
   // ── Modal Baja / Mantenimiento ────────────
@@ -144,25 +204,67 @@ export class Recursos implements OnInit {
     if (this.lockerBaja) {
       this.adminService
         .darBajaLocker(this.lockerBaja.id_locker, {
-          id_admin: 1,
+          id_admin: this.idAdmin,
           motivo: this.motivoBaja,
         })
         .subscribe({
           next: () => {
             this.cerrarModalBaja();
             this.cargarDatos();
+            Swal.fire({ icon: 'success', title: 'Locker actualizado', timer: 1800, showConfirmButton: false });
           },
-          error: (err) => console.error('Error dando de baja:', err),
+          error: (err) => {
+            Swal.fire({
+              icon: 'error',
+              title: err?.error?.detail || 'No se pudo aplicar la acción al locker.',
+              timer: 3000,
+              showConfirmButton: false,
+            });
+            this.cdr.detectChanges();
+          },
         });
     }
   }
 
   // ── Modal Liberación Masiva ───────────────
   abrirModalLiberacion() {
+    this.motivoLiberacion = '';
     this.mostrarModalLiberacion = true;
   }
 
   cerrarModalLiberacion() {
     this.mostrarModalLiberacion = false;
+  }
+
+  confirmarLiberacion() {
+    this.liberando = true;
+    this.adminService
+      .liberacionMasivaLockers({
+        id_admin: this.idAdmin,
+        motivo: this.motivoLiberacion.trim() || undefined,
+      })
+      .subscribe({
+        next: (res) => {
+          this.liberando = false;
+          this.cerrarModalLiberacion();
+          this.cargarDatos();
+          Swal.fire({
+            icon: 'success',
+            title: `${res.lockers_liberados} lockers liberados`,
+            timer: 2200,
+            showConfirmButton: false,
+          });
+        },
+        error: (err) => {
+          this.liberando = false;
+          Swal.fire({
+            icon: 'error',
+            title: err?.error?.detail || 'No se pudo ejecutar la liberación masiva.',
+            timer: 3000,
+            showConfirmButton: false,
+          });
+          this.cdr.detectChanges();
+        },
+      });
   }
 }

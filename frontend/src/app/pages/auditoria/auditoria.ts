@@ -1,5 +1,15 @@
-import { Component, OnInit } from '@angular/core';
-import { AuditoriaMock } from '../../../core/interfaces/admin-interfaces';
+import { Component, HostListener, OnInit, signal } from '@angular/core';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { AdminService } from '../../../core/service/admin-service';
+import { RegistroAccesoAuditoria } from '../../../core/interfaces/admin-interfaces';
+import { descargarBlob, formatearFecha } from '../../../helpers/helpers';
+import Swal from 'sweetalert2';
+
+interface MenuAbierto {
+  registro: RegistroAccesoAuditoria;
+  top: number;
+  left: number;
+}
 
 @Component({
   selector: 'app-auditoria',
@@ -8,58 +18,82 @@ import { AuditoriaMock } from '../../../core/interfaces/admin-interfaces';
   styleUrl: './auditoria.css',
 })
 export class Auditoria implements OnInit {
-  registros: AuditoriaMock[] = [];
-  registrosFiltrados: AuditoriaMock[] = [];
+  // Signals: se reflejan en la vista de inmediato sin depender de zone.js,
+  // igual que en solicitudes.ts.
+  registros = signal<RegistroAccesoAuditoria[]>([]);
+  registrosFiltrados = signal<RegistroAccesoAuditoria[]>([]);
+  cargando = signal(false);
+  exportando = signal(false);
+
+  // Menú de acciones (ícono de 3 puntos) por fila.
+  menuAbierto = signal<MenuAbierto | null>(null);
+
+  // Card de detalle: motivo y evidencia de un acceso denegado.
+  registroDetalle = signal<RegistroAccesoAuditoria | null>(null);
 
   // Filtros
   filtroBusqueda = '';
-  filtroAccion = '';
+  filtroEstado = '';
   filtroFecha = '';
 
-  acciones = [
-    'LOGIN',
-    'LOGOUT',
-    'APROBACIÓN',
-    'RECHAZO',
-    'BAJA_LOCKER',
-    'LIBERACION_MASIVA',
-    'EDICION_USUARIO',
-    'CONFIGURACION',
-  ];
+  estados = ['PERMITIDO', 'DENEGADO'];
+
+  constructor(
+    private adminService: AdminService,
+    private sanitizer: DomSanitizer,
+  ) {}
 
   ngOnInit() {
-    // Tabla vacía — los datos vendrán del endpoint de auditoría cuando esté disponible
-    this.registros = [];
-    this.registrosFiltrados = [];
+    this.cargando.set(true);
+    this.obtenerPaginaDeAuditoria(1, []);
+  }
+
+  private obtenerPaginaDeAuditoria(page: number, acumulado: RegistroAccesoAuditoria[]): void {
+    this.adminService.obtenerAuditoriaAccesos(page).subscribe({
+      next: (respuesta) => {
+        const combinado = [...acumulado, ...respuesta.resultados];
+        if (page < respuesta.total_paginas) {
+          this.obtenerPaginaDeAuditoria(page + 1, combinado);
+          return;
+        }
+        this.registros.set(combinado);
+        this.aplicarFiltros();
+        this.cargando.set(false);
+      },
+      error: () => {
+        this.cargando.set(false);
+      },
+    });
   }
 
   aplicarFiltros() {
-    let resultado = [...this.registros];
+    let resultado = [...this.registros()];
 
     if (this.filtroBusqueda.trim()) {
       const busq = this.filtroBusqueda.toLowerCase();
       resultado = resultado.filter(
         (r) =>
-          r.usuario.toLowerCase().includes(busq) ||
-          r.descripcion.toLowerCase().includes(busq) ||
-          r.accion.toLowerCase().includes(busq)
+          r.guardia_turno.toLowerCase().includes(busq) ||
+          r.alumno.nombre.toLowerCase().includes(busq) ||
+          r.alumno.numero_cuenta.toLowerCase().includes(busq) ||
+          r.tramite.toLowerCase().includes(busq)
       );
     }
 
-    if (this.filtroAccion) {
-      resultado = resultado.filter((r) => r.accion === this.filtroAccion);
+    if (this.filtroEstado) {
+      resultado = resultado.filter((r) => r.estado_acceso === this.filtroEstado);
     }
 
     if (this.filtroFecha) {
-      resultado = resultado.filter((r) => r.fecha.startsWith(this.filtroFecha));
+      resultado = resultado.filter((r) => r.fecha_hora.startsWith(this.filtroFecha));
     }
 
-    this.registrosFiltrados = resultado;
+    this.registrosFiltrados.set(resultado);
   }
 
   limpiarFiltros() {
     this.filtroBusqueda = '';
-    this.filtroAccion = '';
+    this.filtroEstado = '';
     this.filtroFecha = '';
     this.aplicarFiltros();
   }
@@ -70,21 +104,71 @@ export class Auditoria implements OnInit {
   }
 
   exportarExcel() {
-    // Placeholder — pendiente de implementación con endpoint de auditoría
-    alert('Exportar Excel estará disponible cuando se implemente el endpoint de auditoría.');
+    this.exportando.set(true);
+    this.adminService.exportarAuditoriaAccesosExcel().subscribe({
+      next: (blob) => {
+        descargarBlob(blob, 'Registro_de_auditoria_accesos_CUUT.xlsx');
+        this.exportando.set(false);
+      },
+      error: () => {
+        this.exportando.set(false);
+        Swal.fire({
+          icon: 'error',
+          title: 'No se pudo generar el archivo Excel.',
+          timer: 2200,
+          showConfirmButton: false,
+        });
+      },
+    });
   }
 
-  getAccionClase(accion: string): string {
-    const mapa: Record<string, string> = {
-      LOGIN: 'badge--info',
-      LOGOUT: 'badge--muted',
-      APROBACIÓN: 'badge--success',
-      RECHAZO: 'badge--danger',
-      BAJA_LOCKER: 'badge--warning',
-      LIBERACION_MASIVA: 'badge--danger',
-      EDICION_USUARIO: 'badge--info',
-      CONFIGURACION: 'badge--warning',
-    };
-    return mapa[accion] || 'badge--muted';
+  getEstadoClase(estado: string): string {
+    return estado === 'PERMITIDO' ? 'badge--success' : 'badge--danger';
+  }
+
+  // ── Menú de acciones (3 puntos) ─────────────────────────────────
+  toggleMenu(evento: MouseEvent, registro: RegistroAccesoAuditoria) {
+    evento.stopPropagation();
+
+    if (this.menuAbierto()?.registro.id_acceso === registro.id_acceso) {
+      this.menuAbierto.set(null);
+      return;
+    }
+
+    const boton = evento.currentTarget as HTMLElement;
+    const rect = boton.getBoundingClientRect();
+    this.menuAbierto.set({
+      registro,
+      top: rect.bottom + window.scrollY + 4,
+      left: rect.right + window.scrollX - 200,
+    });
+  }
+
+  @HostListener('document:click')
+  cerrarMenu() {
+    this.menuAbierto.set(null);
+  }
+
+  // ── Card de detalle: motivo y evidencia ─────────────────────────
+  abrirDetalle(registro: RegistroAccesoAuditoria) {
+    this.menuAbierto.set(null);
+    this.registroDetalle.set(registro);
+  }
+
+  cerrarDetalle() {
+    this.registroDetalle.set(null);
+  }
+
+  urlEvidencia(idAcceso: number): SafeResourceUrl {
+    return this.sanitizer.bypassSecurityTrustResourceUrl(
+      this.adminService.obtenerUrlEvidenciaAcceso(idAcceso),
+    );
+  }
+
+  formatearFechaHora(fechaHora: string): string {
+    const fecha = formatearFecha(fechaHora);
+    const parteHora = fechaHora.split(/[T ]/)[1];
+    const hora = parteHora ? parteHora.slice(0, 5) : '';
+    return hora ? `${fecha}, ${hora}` : fecha;
   }
 }

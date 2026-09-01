@@ -1,11 +1,14 @@
 import { Component, OnInit } from '@angular/core';
 import { Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
+import { NotificacionService } from '../../core/service/notificacion-service';
+import Swal from 'sweetalert2';
 
 interface MenuItem {
   label: string;
   route: string;
   icon: string;
+  disabled?: boolean;
 }
 
 const ROLE_MENUS: Record<string, MenuItem[]> = {
@@ -17,7 +20,6 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
   ],
   revisor: [
     { label: 'Solicitudes',       route: '/home/solicitudes',     icon: 'inbox'         },
-    { label: 'Recursos',          route: '/home/recursos',        icon: 'package'       },
     { label: 'Reposiciones',      route: '/home/reposiciones',    icon: 'refresh'       },
     { label: 'Notificaciones',    route: '/home/notificaciones',  icon: 'bell'          },
   ],
@@ -28,7 +30,7 @@ const ROLE_MENUS: Record<string, MenuItem[]> = {
     { label: 'Usuarios',          route: '/home/usuarios',        icon: 'users'         },
     { label: 'Crear Cuentas',     route: '/home/crear-cuentas',   icon: 'user-plus'     },
     { label: 'Permisos y Roles',  route: '/home/permisos-roles',  icon: 'shield'        },
-    { label: 'Configuración',     route: '/home/configuracion',   icon: 'settings'      },
+    { label: 'Configuración',     route: '/home/configuracion',   icon: 'settings',   disabled: true },
     { label: 'Auditoría',         route: '/home/auditoria',       icon: 'clipboard'     },
   ],
   vigilante: [
@@ -56,7 +58,10 @@ export class Layout implements OnInit {
   userRole     = '';
   userInitials = '';
 
-  constructor(private router: Router) {}
+  constructor(
+    private router: Router,
+    public notificacionService: NotificacionService,
+  ) {}
 
   ngOnInit() {
     this.userAccount = localStorage.getItem('numeroCuenta') || '';
@@ -80,21 +85,57 @@ export class Layout implements OnInit {
 
     this.router.events
       .pipe(filter(e => e instanceof NavigationEnd))
-      .subscribe((e: any) => { this.currentRoute = e.urlAfterRedirects; });
+      .subscribe((e: any) => {
+        this.currentRoute = e.urlAfterRedirects;
+        this.cargarContadorNotificaciones();
+      });
+
+    this.cargarContadorNotificaciones();
+  }
+
+  private cargarContadorNotificaciones(): void {
+    if (!this.userAccount || !this.menuItems.some(item => item.route === '/home/notificaciones')) {
+      return;
+    }
+    this.notificacionService.contarNoLeidas(this.userAccount, this.userRole).subscribe({
+      error: () => {},
+    });
   }
 
   isActive(route: string): boolean {
     return this.currentRoute.startsWith(route);
   }
 
-  navigate(route: string) {
-    this.router.navigate([route]);
+  navigate(item: MenuItem) {
+    if (item.disabled) return;
+    this.router.navigate([item.route]);
   }
 
   logout() {
-    localStorage.removeItem('numeroCuenta');
-    localStorage.removeItem('rolUsuario');
-    this.router.navigate(['/login']);
+    Swal.fire({
+      title: 'Cerrando sesión…',
+      text: 'Un momento por favor.',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => Swal.showLoading(),
+    });
+
+    setTimeout(() => {
+      localStorage.removeItem('numeroCuenta');
+      localStorage.removeItem('rolUsuario');
+      localStorage.removeItem('idAdmin');
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Sesión cerrada',
+        text: '¡Vuelve pronto!',
+        timer: 1800,
+        showConfirmButton: false,
+      }).then(() => {
+        this.router.navigate(['/login']);
+      });
+    }, 900);
   }
 
   getRoleLabel(): string {
@@ -121,4 +162,14 @@ export class Layout implements OnInit {
     };
     return icons[name] || '';
   }
+  
+  sidebarOpen = false;
+
+toggleSidebar(): void {
+  this.sidebarOpen = !this.sidebarOpen;
+}
+
+closeSidebar(): void {
+  this.sidebarOpen = false;
+}
 }

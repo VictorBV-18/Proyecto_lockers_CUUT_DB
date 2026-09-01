@@ -9,6 +9,7 @@ import {
   SolicitudDetalleRevisor,
   validarDocumento,
   documentoResponse,
+  EnRevisionResponse,
 } from '../interfaces/personalinterfaces';
 
 @Injectable({
@@ -78,6 +79,12 @@ export class PersonalService {
       );
   }
 
+  // Devuelve la URL para previsualizar (inline) el documento subido por el alumno.
+  // El propio <img>/<iframe> hace el GET directamente, no pasa por HttpClient.
+  obtenerUrlDocumento(idDocumento: number): string {
+    return `${this.API_URL}/solicitudes/documentos/${idDocumento}/visualizar`;
+  }
+
   obtenerDetalleSolicitud(idSolicitud: number): Observable<SolicitudDetalleRevisor> {
     return this.http
       .get<SolicitudDetalleRevisor>(`${this.API_URL}/solicitudes/${idSolicitud}/detalle`)
@@ -105,5 +112,21 @@ export class PersonalService {
       `${this.API_URL}/solicitudes/${idSolicitud}/documentos/${idDocumento}`,
       { id_admin: idAdmin, estado: 'RECHAZADO', comentario },
     );
+  }
+
+  // Bloquea la solicitud para que solo este admin pueda revisarla. Si otro admin
+  // ya la tiene abierta, el backend no cambia el estado y hay que avisar en la UI.
+  marcarEnRevision(idSolicitud: number, idAdmin: number): Observable<EnRevisionResponse> {
+    const params = new HttpParams().set('id_admin', idAdmin);
+    return this.http.put<EnRevisionResponse>(
+      `${this.API_URL}/solicitudes/${idSolicitud}/en-revision`,
+      null,
+      { params },
+    );
+  }
+
+  // Libera el bloqueo si el admin cierra el modal sin resolver la solicitud.
+  cancelarRevision(idSolicitud: number): Observable<any> {
+    return this.http.put<any>(`${this.API_URL}/solicitudes/${idSolicitud}/cancelar-revision`, null);
   }
 }

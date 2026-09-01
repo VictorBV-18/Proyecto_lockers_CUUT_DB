@@ -23,22 +23,18 @@
           name="tipoSolicitud"
         >
           <option value="" disabled>Seleccione una opción</option>
-          <option value="estacionamiento" [disabled]="hayEstacionamientoActiva || hayLockerSinValidar">
+          <option value="estacionamiento" [disabled]="hayEstacionamientoActiva">
             Gestión de Permiso de Estacionamiento{{
               hayEstacionamientoActiva
-                ? ' — ya tienes una en revisión'
-                : hayLockerSinValidar
-                  ? ' — tienes una solicitud de locker sin validar'
+                ? ' — límite de 3 permisos alcanzado'
+                : estacionamientosActivosCount > 0
+                  ? ' (' + estacionamientosActivosCount + '/3 usados)'
                   : ''
             }}
           </option>
-          <option value="locker" [disabled]="hayLockerActivo || hayEstacionamientoSinValidar">
+          <option value="locker" [disabled]="hayLockerActivo">
             Gestión para la obtención de locker{{
-              hayLockerActivo
-                ? ' — ya tienes una en revisión'
-                : hayEstacionamientoSinValidar
-                  ? ' — tienes una solicitud de estacionamiento sin validar'
-                  : ''
+              hayLockerActivo ? ' — ya tienes una en revisión' : ''
             }}
           </option>
         </select>
@@ -155,9 +151,6 @@
       </div>
 
       <div class="actions fade-in" *ngIf="!mostrarFormVehiculo">
-        <button class="btn btn-secondary" type="button" (click)="guardarBorrador()">
-          Guardar Borrador
-        </button>
         <button
           class="btn btn-primary"
           type="button"
@@ -230,7 +223,7 @@
       </ul>
     </div>
 
-    <div class="info-card-warn" title="No se permiten dos solicitudes activas del mismo tipo">
+    <div class="info-card-warn" title="Límites de solicitudes activas por trámite">
       <h4>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -241,8 +234,9 @@
         Notas Importantes
       </h4>
       <p>
-        No se permiten <strong>dos solicitudes activas del mismo tipo</strong>. Si ya tienes
-        una solicitud en revisión, deberás esperar la resolución antes de generar otra.
+        Solo puedes tener <strong>1 solicitud de locker</strong> activa a la vez. Para
+        estacionamiento puedes tener hasta <strong>3 permisos activos</strong> (uno por
+        vehículo), pero cada uno requiere que subas de nuevo todos los documentos obligatorios.
       </p>
     </div>
 

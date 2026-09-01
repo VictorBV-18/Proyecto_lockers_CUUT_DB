@@ -1,6 +1,6 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { SolicitudService } from '../../../core/service/solicitud-service';
-import { RecursoActivo } from '../../../core/interfaces/interfaces';
+import { PerfilAlumnoResponse } from '../../../core/interfaces/interfaces';
 
 @Component({
   selector: 'app-mi-perfil',
@@ -11,8 +11,8 @@ import { RecursoActivo } from '../../../core/interfaces/interfaces';
 export class MiPerfil implements OnInit {
   numeroCuenta = localStorage.getItem('numeroCuenta') || '';
 
-  vehiculo: RecursoActivo | null = null;
-  cargandoVehiculo = true;
+  perfil: PerfilAlumnoResponse | null = null;
+  cargandoPerfil = true;
 
   contrasenaActual = '';
   contrasenaNueva = '';
@@ -25,31 +25,42 @@ export class MiPerfil implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.cargarVehiculo();
+    this.cargarPerfil();
   }
 
-  private cargarVehiculo(): void {
-    this.solicitudService.obtenerDetallesTramite(this.numeroCuenta).subscribe({
+  private cargarPerfil(): void {
+    this.solicitudService.obtenerPerfilAlumno(this.numeroCuenta).subscribe({
       next: (response) => {
-        this.vehiculo =
-          response.recursos_activos.find((r) => r.tipo_tramite === 'estacionamiento') ?? null;
-        this.cargandoVehiculo = false;
+        this.perfil = response;
+        this.cargandoPerfil = false;
         this.cdr.detectChanges();
       },
       error: () => {
-        this.cargandoVehiculo = false;
+        this.cargandoPerfil = false;
         this.cdr.detectChanges();
       },
     });
   }
 
   cambiarContrasena(): void {
-    if (!this.contrasenaActual || !this.contrasenaNueva || !this.confirmarContrasena) {
+    if (
+      !this.contrasenaActual.trim() ||
+      !this.contrasenaNueva.trim() ||
+      !this.confirmarContrasena.trim()
+    ) {
       this.solicitudService.peticionError('Completa todos los campos.');
+      return;
+    }
+    if (this.contrasenaNueva.length < 8) {
+      this.solicitudService.peticionError('La nueva contraseña debe tener al menos 8 caracteres.');
       return;
     }
     if (this.contrasenaNueva !== this.confirmarContrasena) {
       this.solicitudService.peticionError('Las contraseñas nuevas no coinciden.');
+      return;
+    }
+    if (this.contrasenaNueva === this.contrasenaActual) {
+      this.solicitudService.peticionError('La nueva contraseña debe ser diferente a la actual.');
       return;
     }
 

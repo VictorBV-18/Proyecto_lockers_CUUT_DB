@@ -1,27 +1,55 @@
 <div class="page-header">
   <h1 class="page-title">Mi Perfil</h1>
-  <p class="page-desc">Consulta los datos de tu vehículo y actualiza tu contraseña.</p>
+  <p class="page-desc">Consulta tus datos personales, los de tu vehículo y actualiza tu contraseña.</p>
 </div>
 
-@if (vehiculo) {
+@if (perfil) {
   <div class="config-card">
-    <h3 class="card-title">Información del Vehículo</h3>
-    <p class="card-desc">Datos registrados en tu trámite de estacionamiento activo.</p>
+    <h3 class="card-title">Datos Personales</h3>
+    <p class="card-desc">Información registrada en tu cuenta.</p>
 
     <div class="form-grid">
       <div class="form-field">
-        <label class="field-label">Placas</label>
-        <input type="text" class="field-input" [value]="vehiculo.detalles_recurso.placas" readonly />
+        <label class="field-label">Número de cuenta</label>
+        <input type="text" class="field-input" [value]="perfil.numero_cuenta" readonly />
       </div>
       <div class="form-field">
-        <label class="field-label">Modelo</label>
-        <input type="text" class="field-input" [value]="vehiculo.detalles_recurso.modelo" readonly />
+        <label class="field-label">Nombre completo</label>
+        <input type="text" class="field-input" [value]="perfil.nombre_completo" readonly />
       </div>
       <div class="form-field">
-        <label class="field-label">Color</label>
-        <input type="text" class="field-input" [value]="vehiculo.detalles_recurso.color" readonly />
+        <label class="field-label">Carrera</label>
+        <input type="text" class="field-input" [value]="perfil.carrera" readonly />
+      </div>
+      <div class="form-field">
+        <label class="field-label">Correo electrónico</label>
+        <input type="text" class="field-input" [value]="perfil.correo_electronico" readonly />
       </div>
     </div>
+  </div>
+}
+
+@if (perfil && perfil.vehiculos_registrados.length > 0) {
+  <div class="config-card">
+    <h3 class="card-title">Vehículos Registrados</h3>
+    <p class="card-desc">Datos de los vehículos registrados en tus trámites de estacionamiento.</p>
+
+    @for (vehiculo of perfil.vehiculos_registrados; track $index) {
+      <div class="form-grid">
+        <div class="form-field">
+          <label class="field-label">Placas</label>
+          <input type="text" class="field-input" [value]="vehiculo.placas" readonly />
+        </div>
+        <div class="form-field">
+          <label class="field-label">Modelo</label>
+          <input type="text" class="field-input" [value]="vehiculo.modelo" readonly />
+        </div>
+        <div class="form-field">
+          <label class="field-label">Color</label>
+          <input type="text" class="field-input" [value]="vehiculo.color" readonly />
+        </div>
+      </div>
+    }
   </div>
 }
 
@@ -48,7 +76,8 @@
         type="password"
         class="field-input"
         [(ngModel)]="contrasenaNueva"
-        placeholder="Nueva contraseña"
+        minlength="8"
+        placeholder="Mínimo 8 caracteres"
       />
     </div>
 

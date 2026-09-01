@@ -34,11 +34,11 @@
 
 <!-- Botones de Acción -->
 <div class="actions-bar">
-  <button class="btn btn--outline">
+  <button class="btn btn--outline" disabled title="Próximamente disponible">
     <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
     Importar CSV
   </button>
-  <button class="btn btn--outline">
+  <button class="btn btn--outline" disabled title="Próximamente disponible">
     <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
     Exportar Excel
   </button>
@@ -73,8 +73,13 @@
           </td>
           <td class="td-actions">
             <button class="btn btn--sm btn--ghost" (click)="abrirModalEditar(l)">Editar</button>
-            <button class="btn btn--sm btn--outline-warning" (click)="abrirModalBaja(l, 'Mantenimiento')" [disabled]="l.estado === 'OCUPADO'">Mantenimiento</button>
-            <button class="btn btn--sm btn--outline-danger" (click)="abrirModalBaja(l, 'Dar de Baja')" [disabled]="l.estado === 'OCUPADO'">Dar de Baja</button>
+            <ng-container *ngIf="l.estado === 'MANTENIMIENTO'; else accionesBaja">
+              <button class="btn btn--sm btn--outline-success" (click)="confirmarAlta(l)">Reactivar</button>
+            </ng-container>
+            <ng-template #accionesBaja>
+              <button class="btn btn--sm btn--outline-warning" (click)="abrirModalBaja(l, 'Mantenimiento')" [disabled]="l.estado === 'OCUPADO'">Mantenimiento</button>
+              <button class="btn btn--sm btn--outline-danger" (click)="abrirModalBaja(l, 'Dar de Baja')" [disabled]="l.estado === 'OCUPADO'">Dar de Baja</button>
+            </ng-template>
           </td>
         </tr>
         <tr *ngIf="lockers.length === 0">
@@ -151,12 +156,21 @@
     </div>
     <div class="modal-body">
       <p class="modal-text">
-        Esta acción liberará todos los lockers ocupados. Es una operación irreversible.
+        Esta acción liberará todos los lockers ocupados y vencerá sus constancias activas. Es una operación irreversible.
       </p>
-      <p class="modal-warning">⚠ Esta funcionalidad estará disponible cuando se implemente el endpoint correspondiente.</p>
+      <label class="field-label">Motivo (opcional)</label>
+      <textarea
+        class="field-textarea"
+        [(ngModel)]="motivoLiberacion"
+        placeholder="Ej: Fin de ciclo escolar"
+        rows="2"
+      ></textarea>
     </div>
     <div class="modal-footer">
-      <button class="btn btn--ghost" (click)="cerrarModalLiberacion()">Cerrar</button>
+      <button class="btn btn--ghost" [disabled]="liberando" (click)="cerrarModalLiberacion()">Cancelar</button>
+      <button class="btn btn--danger" [disabled]="liberando" (click)="confirmarLiberacion()">
+        {{ liberando ? 'Liberando...' : 'Confirmar Liberación' }}
+      </button>
     </div>
   </div>
 </div>

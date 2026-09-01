@@ -3,11 +3,32 @@
   <p class="page-desc">Gestiona los permisos de acceso y roles de los usuarios.</p>
 </div>
 
+<!-- Filtros -->
+<div class="filters-bar">
+  <input
+    type="text"
+    class="filter-input filter-input--search"
+    placeholder="Buscar por número de cuenta o nombre..."
+    [(ngModel)]="filtroBusqueda"
+    (keyup.enter)="aplicarFiltros()"
+  />
+
+  <select class="filter-input" [(ngModel)]="filtroRol">
+    <option value="">Todos los roles</option>
+    <option value="ALUMNO">Alumno</option>
+    <option *ngFor="let r of roles" [value]="r">{{ getRolTexto(r) }}</option>
+  </select>
+
+  <button type="button" class="btn-aplicar" (click)="aplicarFiltros()">Aplicar filtros</button>
+  <button type="button" class="btn-limpiar" (click)="limpiarFiltros()">Limpiar</button>
+</div>
+
 <div class="table-card">
   <div class="table-wrapper">
     <table class="data-table">
       <thead>
         <tr>
+          <th>Número de cuenta</th>
           <th>Nombre</th>
           <th>Correo</th>
           <th>Rol</th>
@@ -16,21 +37,47 @@
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let u of usuarios">
-          <td class="td-name">{{ u.nombre }}</td>
-          <td>{{ u.correo }}</td>
-          <td>{{ getRolTexto(u.rol) }}</td>
-          <td>
-            <span class="badge" [ngClass]="u.habilitado ? 'badge--success' : 'badge--muted'">
-              {{ u.habilitado ? 'Habilitado' : 'Deshabilitado' }}
-            </span>
-          </td>
-          <td>
-            <button class="btn btn--sm btn--outline" (click)="abrirModal(u)">Editar</button>
-          </td>
+        <tr *ngIf="cargando">
+          <td colspan="6" class="td-empty">Cargando usuarios…</td>
         </tr>
+        <ng-container *ngIf="!cargando">
+          <tr *ngFor="let u of usuarios">
+            <td>{{ u.numero_cuenta }}</td>
+            <td class="td-name">{{ u.nombre_completo }}</td>
+            <td>{{ u.correo_electronico || '—' }}</td>
+            <td>{{ getRolTexto(u.rol) }}</td>
+            <td>
+              <span class="badge" [ngClass]="u.estado_activo ? 'badge--success' : 'badge--muted'">
+                {{ u.estado_activo ? 'Habilitado' : 'Deshabilitado' }}
+              </span>
+            </td>
+            <td class="td-actions">
+              <button class="btn btn--sm btn--outline" (click)="abrirModal(u)">Editar</button>
+              <button
+                *ngIf="u.rol === 'ALUMNO' && !u.estado_activo"
+                class="btn btn--sm btn--warning"
+                (click)="abrirApelacion(u)"
+              >
+                Ver apelación
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="usuarios.length === 0">
+            <td colspan="6" class="td-empty">No se encontraron usuarios.</td>
+          </tr>
+        </ng-container>
       </tbody>
     </table>
+  </div>
+
+  <div class="pagination-bar" *ngIf="!cargando && totalRegistros > 0">
+    <span class="pagination-info">
+      Página {{ paginaActual }} de {{ totalPaginas }} · {{ totalRegistros }} usuarios
+    </span>
+    <div class="pagination-controls">
+      <button type="button" [disabled]="paginaActual <= 1" (click)="paginaAnterior()">Anterior</button>
+      <button type="button" [disabled]="paginaActual >= totalPaginas" (click)="paginaSiguiente()">Siguiente</button>
+    </div>
   </div>
 </div>
 
@@ -43,13 +90,18 @@
     </div>
     <div class="modal-body">
       <p class="modal-text">
-        Editando a <strong>{{ usuarioSeleccionado?.nombre }}</strong>
+        Editando a <strong>{{ usuarioSeleccionado?.nombre_completo }}</strong>
       </p>
 
-      <label class="field-label">Rol</label>
-      <select class="field-input" [(ngModel)]="nuevoRol">
-        <option *ngFor="let r of roles" [value]="r">{{ getRolTexto(r) }}</option>
-      </select>
+      <ng-container *ngIf="usuarioSeleccionado && puedeEditarRol(usuarioSeleccionado); else sinCambioRol">
+        <label class="field-label">Rol</label>
+        <select class="field-input" [(ngModel)]="nuevoRol">
+          <option *ngFor="let r of roles" [value]="r">{{ getRolTexto(r) }}</option>
+        </select>
+      </ng-container>
+      <ng-template #sinCambioRol>
+        <p class="modal-text">Los alumnos no pueden cambiar de rol.</p>
+      </ng-template>
 
       <div class="toggle-group">
         <label class="field-label">Cuenta habilitada</label>
@@ -60,8 +112,88 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn--ghost" (click)="cerrarModal()">Cancelar</button>
-      <button class="btn btn--primary" (click)="guardarCambios()">Guardar Cambios</button>
+      <button class="btn btn--ghost" [disabled]="guardando" (click)="cerrarModal()">Cancelar</button>
+      <button class="btn btn--primary" [disabled]="guardando" (click)="guardarCambios()">
+        {{ guardando ? 'Guardando...' : 'Guardar Cambios' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Apelación / Desbloqueo de acceso -->
+<div class="modal-overlay" *ngIf="mostrarModalApelacion" (click)="cerrarApelacion()">
+  <div class="modal-content modal-content--wide" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">Historial de accesos denegados</h3>
+      <button class="modal-close" (click)="cerrarApelacion()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-text">
+        Alumno <strong>{{ usuarioApelacion?.nombre_completo }}</strong>
+        ({{ usuarioApelacion?.numero_cuenta }})
+      </p>
+
+      <div *ngIf="cargandoHistorial" class="td-empty">Cargando historial…</div>
+
+      <ng-container *ngIf="!cargandoHistorial">
+        <div *ngIf="historialDenegados.length === 0" class="td-empty">
+          No hay accesos denegados registrados para este alumno.
+        </div>
+
+        <div class="apelacion-list" *ngIf="historialDenegados.length > 0">
+          <div class="apelacion-item" *ngFor="let r of historialDenegados">
+            <div class="apelacion-item__row">
+              <span class="apelacion-item__fecha">{{ r.fecha_rechazo }}</span>
+              <span class="badge badge--muted">{{ r.tramite }}</span>
+            </div>
+            <p class="apelacion-item__motivo">{{ r.motivo }}</p>
+            <div class="apelacion-item__meta">
+              <span>Guardia: {{ r.guardia }}</span>
+              <span>Folio: {{ r.folio }}</span>
+            </div>
+            <button
+              type="button"
+              class="btn btn--sm btn--outline"
+              *ngIf="r.evidencia"
+              (click)="verEvidencia(r)"
+            >
+              Ver evidencia fotográfica
+            </button>
+          </div>
+        </div>
+      </ng-container>
+
+      <label class="field-label">Comentario del desbloqueo</label>
+      <textarea
+        class="field-input"
+        rows="3"
+        placeholder="Explica por qué se acepta la apelación…"
+        [(ngModel)]="comentarioDesbloqueo"
+        [disabled]="desbloqueando"
+      ></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn--ghost" [disabled]="desbloqueando" (click)="cerrarApelacion()">Cancelar</button>
+      <button
+        class="btn btn--primary"
+        [disabled]="desbloqueando || !comentarioDesbloqueo.trim()"
+        (click)="desbloquearAcceso()"
+      >
+        {{ desbloqueando ? 'Desbloqueando…' : 'Desbloquear cuenta' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Preview de evidencia fotográfica -->
+<div class="modal-overlay" *ngIf="evidenciaPreview" (click)="cerrarPreviewEvidencia()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">Evidencia fotográfica</h3>
+      <button class="modal-close" (click)="cerrarPreviewEvidencia()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <img [src]="evidenciaPreview" alt="Evidencia del acceso denegado" class="apelacion-evidencia-img" />
     </div>
   </div>
 </div>

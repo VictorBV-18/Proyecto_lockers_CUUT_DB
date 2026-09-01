@@ -3,12 +3,10 @@ from pydantic import BaseModel
 from app.db.conexion import conectar_base
 import shutil
 import os
-from typing import Optional
+from typing import Optional, List
 from app.utils.seguridad import obtener_hash_contrasena, verificar_contrasena
 
 router = APIRouter()
-
-# Carpeta donde se guardan los documentos
 CARPETA_UPLOADS = "uploads"
 if not os.path.exists(CARPETA_UPLOADS):
     os.makedirs(CARPETA_UPLOADS)
@@ -16,16 +14,11 @@ if not os.path.exists(CARPETA_UPLOADS):
 class SolicitudCrear(BaseModel):
     numero_cuenta: str
     tipo_tramite: str 
-    correo_electronico: str
     placas: Optional[str] = None
     modelo: Optional[str] = None
     color: Optional[str] = None
 
-
-
-
-
-@router.post("/solicitudes/", tags=["Alumno"], summary="Crear una nueva solicitud de tramite (Se guarda como borrador la solicitud)")
+@router.post("/solicitudes/", tags=["Alumno"], summary="Crear una nueva solicitud de tramite el limite son 1 locker y 3 estacionamiento")
 def crear_solicitud(solicitud: SolicitudCrear):
     tramite = solicitud.tipo_tramite.lower()
     if tramite not in ["locker", "estacionamiento"]:
@@ -51,24 +44,26 @@ def crear_solicitud(solicitud: SolicitudCrear):
             
         id_alumno_real = alumno_bd[0]
 
-        cursor.execute(
-            "UPDATE alumno SET correo_electronico = %s WHERE id_alumno = %s", 
-            (solicitud.correo_electronico, id_alumno_real)
-        )
-
-        cursor.execute(
-            """
-            SELECT id_solicitud FROM solicitud 
-            WHERE id_alumno = %s AND tipo_tramite = %s AND estado IN ('PENDIENTE', 'EN_REVISION', 'APROBADA', 'DATOS_INCOMPLETOS')
-            """,
-            (id_alumno_real, tramite)
-        )
-        solicitud_existente = cursor.fetchone()
-
-        if solicitud_existente:
-            cursor.close()
-            conexion.close()
-            raise HTTPException(status_code=400, detail=f"Ya tienes una solicitud de {tramite} en proceso o activa.")
+        if tramite == 'locker':
+            cursor.execute("""
+                SELECT id_solicitud FROM solicitud 
+                WHERE id_alumno = %s AND tipo_tramite = 'locker' AND estado IN ('DATOS_INCOMPLETOS', 'PENDIENTE', 'EN_REVISION', 'APROBADA', 'DOCUMENTACION_INCORRECTA', 'REPOSICION')
+            """, (id_alumno_real,))
+            if cursor.fetchone():
+                cursor.close()
+                conexion.close()
+                raise HTTPException(status_code=400, detail="Ya tienes una solicitud de locker en proceso o activa. Termina tu solicitud anterior.")
+        
+        elif tramite == 'estacionamiento':
+            cursor.execute("""
+                SELECT COUNT(*) FROM solicitud 
+                WHERE id_alumno = %s AND tipo_tramite = 'estacionamiento' AND estado IN ('DATOS_INCOMPLETOS', 'PENDIENTE', 'EN_REVISION', 'APROBADA', 'DOCUMENTACION_INCORRECTA', 'REPOSICION')
+            """, (id_alumno_real,))
+            conteo_estacionamientos = cursor.fetchone()[0]
+            if conteo_estacionamientos >= 3:
+                cursor.close()
+                conexion.close()
+                raise HTTPException(status_code=400, detail="Ya has alcanzado el límite máximo de 3 permisos de estacionamiento activos o en proceso.")
 
         cursor.execute(
             """
@@ -97,7 +92,6 @@ def crear_solicitud(solicitud: SolicitudCrear):
             "id_solicitud": id_generado,
             "estado": "DATOS_INCOMPLETOS"
         }
-
     except HTTPException:
         raise 
     except Exception as e:
@@ -105,12 +99,9 @@ def crear_solicitud(solicitud: SolicitudCrear):
             conexion.rollback()
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
-    
 
 
-
-
-@router.post("/solicitudes/{id_solicitud}/documentos/", tags=["Alumno"], summary="Subir documentos a la solicitud del borrador")
+@router.post("/solicitudes/{id_solicitud}/documentos/", tags=["Alumno"], summary="Subir documentos a la solicitud del borrador (Incluso si esta vencida o rechazada)")
 async def subir_documento(
     id_solicitud: int, 
     id_tipo_documento: int = Form(...), 
@@ -166,7 +157,7 @@ async def subir_documento(
         cursor.execute("""
             UPDATE solicitud
             SET estado = 'PENDIENTE'
-            WHERE id_solicitud = %s AND estado = 'DOCUMENTACION_INCORRECTA'
+            WHERE id_solicitud = %s AND estado IN ('DOCUMENTACION_INCORRECTA', 'VENCIDA')
         """, (id_solicitud,))
         
         cursor.execute("""
@@ -175,7 +166,7 @@ async def subir_documento(
         """, (id_solicitud,))
         info_solicitud = cursor.fetchone()
         
-        if info_solicitud and info_solicitud[2] != 'DATOS_INCOMPLETOS':
+        if info_solicitud and info_solicitud[2] != 'DATOS_INCOMPLETOS' and info_solicitud[2] != 'VENCIDA':
             cursor.execute("""
                 INSERT INTO notificaciones (rol_destino, titulo, mensaje)
                 VALUES ('REVISOR', 'Documento Actualizado', %s)
@@ -199,10 +190,7 @@ async def subir_documento(
         raise HTTPException(status_code=500, detail=f"Error al guardar en BD: {str(e)}")
 
 
-
-
-
-@router.post("/solicitudes/{id_solicitud}/enviar_solicitud", tags=["Alumno"], summary="Enviar solicitud completa y confirmar que los documentos han sido subidos completos")
+@router.post("/solicitudes/{id_solicitud}/enviar_solicitud", tags=["Alumno"], summary="Enviar solicitud completa para revisión y detectar si es REPOSICION o NUEVA")
 def finalizar_solicitud(id_solicitud: int):
     conexion = conectar_base()
     if conexion is None:
@@ -212,7 +200,7 @@ def finalizar_solicitud(id_solicitud: int):
         cursor = conexion.cursor()
         
         cursor.execute("""
-            SELECT tipo_tramite, estado FROM solicitud WHERE id_solicitud = %s
+            SELECT id_alumno, tipo_tramite, estado FROM solicitud WHERE id_solicitud = %s
         """, (id_solicitud,))
         solicitud = cursor.fetchone()
         
@@ -221,13 +209,14 @@ def finalizar_solicitud(id_solicitud: int):
             conexion.close()
             raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
 
-        tramite = solicitud[0]
-        estado_actual = solicitud[1]
+        id_alumno_bd = solicitud[0]
+        tramite = solicitud[1]
+        estado_actual = solicitud[2]
 
-        if estado_actual != 'DATOS_INCOMPLETOS':
+        if estado_actual != 'DATOS_INCOMPLETOS' and estado_actual != 'PENDIENTE':
             cursor.close()
             conexion.close()
-            raise HTTPException(status_code=400, detail=f"La solicitud ya se encuentra en estado: {estado_actual}")
+            raise HTTPException(status_code=400, detail=f"La solicitud no se puede enviar porque se encuentra en estado: {estado_actual}")
 
         cursor.execute("""
             SELECT COUNT(*) FROM tipo_documento 
@@ -249,13 +238,29 @@ def finalizar_solicitud(id_solicitud: int):
             )
 
         cursor.execute("""
-            UPDATE solicitud SET estado = 'PENDIENTE', fecha_solicitud = CURRENT_TIMESTAMP WHERE id_solicitud = %s
+            SELECT 1 FROM historial_estados 
+            WHERE id_solicitud = %s AND estado_nuevo = 'VENCIDA'
+            LIMIT 1
         """, (id_solicitud,))
+        es_reposicion_misma = cursor.fetchone()
+
+        cursor.execute("""
+            SELECT id_solicitud FROM solicitud 
+            WHERE id_alumno = %s AND tipo_tramite = %s AND estado IN ('VENCIDA', 'FINALIZADA')
+            LIMIT 1
+        """, (id_alumno_bd, tramite))
+        es_reposicion_otra = cursor.fetchone()
+
+        nuevo_estado = "REPOSICION" if (es_reposicion_misma or es_reposicion_otra) else "PENDIENTE"
+
+        cursor.execute("""
+            UPDATE solicitud SET estado = %s, fecha_solicitud = CURRENT_TIMESTAMP WHERE id_solicitud = %s
+        """, (nuevo_estado, id_solicitud))
         
         cursor.execute("""
             INSERT INTO notificaciones (rol_destino, titulo, mensaje)
             VALUES ('REVISOR', 'Nueva Solicitud Completa', %s)
-        """, (f"Una solicitud de {tramite} (ID: {id_solicitud}) ha completado sus documentos y está lista para revisión.",))
+        """, (f"Una solicitud de {tramite} (ID: {id_solicitud}) ha completado sus documentos. Estado: {nuevo_estado}.",))
 
         conexion.commit()
         cursor.close()
@@ -263,7 +268,7 @@ def finalizar_solicitud(id_solicitud: int):
 
         return {
             "mensaje": "Documentos validados. Solicitud enviada a revisión correctamente.", 
-            "nuevo_estado": "PENDIENTE"
+            "nuevo_estado": nuevo_estado
         }
 
     except HTTPException:
@@ -275,11 +280,7 @@ def finalizar_solicitud(id_solicitud: int):
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
 
-
-
-
-
-@router.get("/solicitudes/{numero_cuenta}/general", tags=["Alumno"], summary="Obtener (folio, tramite, fecha, estado) de manera general del alumno")
+@router.get("/solicitudes/{numero_cuenta}/general", tags=["Alumno"], summary="Obtener (folio, tramite, fecha, estado, qr_token) de manera general del alumno")
 def resumen_solicitud(numero_cuenta: str):
     conexion = conectar_base()
     if conexion is None:
@@ -298,10 +299,17 @@ def resumen_solicitud(numero_cuenta: str):
         id_alumno = alumno[0]
 
         cursor.execute("""
-            SELECT id_solicitud, tipo_tramite, fecha_solicitud, estado 
-            FROM solicitud 
-            WHERE id_alumno = %s
-            ORDER BY fecha_solicitud DESC
+            SELECT 
+                s.id_solicitud, 
+                s.tipo_tramite, 
+                s.fecha_solicitud, 
+                s.estado,
+                c.qr_token
+            FROM solicitud s
+            LEFT JOIN asignacion asg ON s.id_solicitud = asg.id_solicitud
+            LEFT JOIN constancia c ON asg.id_asignacion = c.id_asignacion
+            WHERE s.id_alumno = %s
+            ORDER BY s.fecha_solicitud DESC
         """, (id_alumno,))
 
         filas = cursor.fetchall()
@@ -313,7 +321,8 @@ def resumen_solicitud(numero_cuenta: str):
                 "folio": f"FOL-{fila[0]:04d}", 
                 "tipo_tramite": fila[1],
                 "fecha_solicitud": fila[2],
-                "estado_solicitud": fila[3]
+                "estado_solicitud": fila[3],
+                "qr_token": str(fila[4]) if fila[4] else None 
             })
 
         cursor.close()
@@ -332,10 +341,7 @@ def resumen_solicitud(numero_cuenta: str):
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
 
-
-
-
-@router.get("/solicitudes/{numero_cuenta}", tags=["Alumno"], summary="Obtener el historial de las solicitudes del alumno de forma detallada, asi como el documento, el estado y el comentario del administrador")
+@router.get("/solicitudes/{numero_cuenta}", tags=["Alumno"], summary="Obtener el historial de las solicitudes del alumno de forma detallada")
 def consultar_solicitudes_por_alumno(numero_cuenta: str):
     conexion = conectar_base()
     if conexion is None:
@@ -408,7 +414,6 @@ def consultar_solicitudes_por_alumno(numero_cuenta: str):
         if conexion:
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
-    
 
 
 class CambioContrasena(BaseModel):
@@ -423,7 +428,6 @@ def cambiar_contrasena_alumno(numero_cuenta: str, datos: CambioContrasena):
 
     try:
         cursor = conexion.cursor()
-        
         cursor.execute("SELECT contrasena_hash FROM alumno WHERE numero_cuenta = %s", (numero_cuenta,))
         resultado = cursor.fetchone()
         
@@ -434,15 +438,12 @@ def cambiar_contrasena_alumno(numero_cuenta: str, datos: CambioContrasena):
             
         hash_bd = resultado[0]
         
-    
         if not verificar_contrasena(datos.contrasena_actual, hash_bd):
             cursor.close()
             conexion.close()
             raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta.")
             
-    
         nuevo_hash = obtener_hash_contrasena(datos.contrasena_nueva)
-        
         cursor.execute("""
             UPDATE alumno SET contrasena_hash = %s WHERE numero_cuenta = %s
         """, (nuevo_hash, numero_cuenta))
@@ -460,13 +461,10 @@ def cambiar_contrasena_alumno(numero_cuenta: str, datos: CambioContrasena):
             conexion.rollback()
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
-    
 
 
-
-
-@router.get("/alumno/{numero_cuenta}/detalles-tramite", tags=["Alumno"], summary="Obtener los detalles activos de los tramites (Locker / Estacionamiento) del alumno")
-def obtener_recursos_activos(numero_cuenta: str):
+@router.get("/alumno/{numero_cuenta}/mi-perfil", tags=["Alumno"], summary="Datos del perfil del alumno")
+def obtener_perfil_alumno(numero_cuenta: str):
     conexion = conectar_base()
     if conexion is None:
         raise HTTPException(status_code=500, detail="Error de conexión a la BD")
@@ -474,74 +472,127 @@ def obtener_recursos_activos(numero_cuenta: str):
     try:
         cursor = conexion.cursor()
         
-        query = """
-            SELECT 
-                s.id_solicitud,
-                s.tipo_tramite,
-                ag.id_asignacion,
-                ag.fecha_asignacion,
-                l.codigo_locker,
-                l.ubicacion,
-                c.folio,
-                c.qr_token,
-                c.vigencia,
-                c.estado as estado_documento,
-                c.documento_path,
-                v.placas,
-                v.modelo,
-                v.color -- Agregado: Extraemos el color de la base de datos
-            FROM alumno a
-            JOIN solicitud s ON a.id_alumno = s.id_alumno
-            JOIN asignacion ag ON s.id_solicitud = ag.id_solicitud
-            LEFT JOIN constancia c ON ag.id_asignacion = c.id_asignacion
-            LEFT JOIN locker l ON ag.id_locker = l.id_locker
-            LEFT JOIN vehiculo_solicitud v ON s.id_solicitud = v.id_solicitud
-            WHERE a.numero_cuenta = %s AND ag.estado = 'ACTIVA'
-        """
-        cursor.execute(query, (numero_cuenta,))
-        filas = cursor.fetchall()
+        cursor.execute("""
+            SELECT id_alumno, numero_cuenta, nombre, apellidos, carrera, correo_electronico, estado_activo
+            FROM alumno
+            WHERE numero_cuenta = %s
+        """, (numero_cuenta,))
         
+        alumno = cursor.fetchone()
+        
+        if not alumno:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=404, detail="Alumno no encontrado.")
+            
+        id_alumno = alumno[0]
+
+        cursor.execute("""
+            SELECT DISTINCT v.placas, v.modelo, v.color 
+            FROM vehiculo_solicitud v
+            JOIN solicitud s ON v.id_solicitud = s.id_solicitud
+            WHERE s.id_alumno = %s
+        """, (id_alumno,))
+        
+        vehiculos_bd = cursor.fetchall()
+        lista_vehiculos = [{"placas": v[0], "modelo": v[1], "color": v[2]} for v in vehiculos_bd]
+
         cursor.close()
         conexion.close()
         
-        recursos = []
-        for fila in filas:
-            recurso = {
-                "id_solicitud": fila[0],
-                "tipo_tramite": fila[1],
-                "fecha_asignacion": fila[3],
-                "documento": None,
-                "detalles_recurso": {}
-            }
-            
-            
-            if fila[6]:
-                recurso["documento"] = {
-                    "folio": fila[6],
-                    "qr_token": str(fila[7]),
-                    "vigencia": fila[8],
-                    "estado": fila[9],
-                    "url_descarga": f"/documentos/descargar/{str(fila[7])}",
-                    "documento_path": fila[10] 
-                }
-                
-            
-            if fila[1] == 'locker':
-                recurso["detalles_recurso"] = {
-                    "codigo_locker": fila[4],
-                    "ubicacion": fila[5]
-                }
-            elif fila[1] == 'estacionamiento':
-                recurso["detalles_recurso"] = {
-                    "placas": fila[11],
-                    "modelo": fila[12],
-                    "color": fila[13] 
-                }
-                
-            recursos.append(recurso)
-            
-        return {"numero_cuenta": numero_cuenta, "recursos_activos": recursos}
+        return {
+            "numero_cuenta": alumno[1],
+            "nombre_completo": f"{alumno[2]} {alumno[3]}",
+            "carrera": alumno[4],
+            "correo_electronico": alumno[5],
+            "estado_activo": alumno[6],
+            "vehiculos_registrados": lista_vehiculos
+        }
 
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conexion:
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+
+@router.get("/solicitudes/{id_solicitud}/recurso-activo", tags=["Alumno"], summary="Botón (Detalles), para obtener recurso activo de una solicitud específica aprobada")
+def obtener_recurso_activo_por_solicitud(id_solicitud: int):
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+        
+        cursor.execute("""
+            SELECT s.tipo_tramite, s.estado, ag.id_asignacion, ag.fecha_asignacion,
+                   l.codigo_locker, l.ubicacion,
+                   c.folio, c.qr_token, c.vigencia, c.estado as estado_documento, c.documento_path,
+                   al.nombre, al.apellidos, al.numero_cuenta
+            FROM solicitud s
+            JOIN alumno al ON s.id_alumno = al.id_alumno
+            LEFT JOIN asignacion ag ON s.id_solicitud = ag.id_solicitud
+            LEFT JOIN locker l ON ag.id_locker = l.id_locker
+            LEFT JOIN constancia c ON ag.id_asignacion = c.id_asignacion
+            WHERE s.id_solicitud = %s
+        """, (id_solicitud,))
+        
+        datos = cursor.fetchone()
+        
+        if not datos:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+            
+        if datos[1] != 'APROBADA':
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=400, detail="La solicitud debe estar APROBADA para ver sus detalles activos.")
+
+        respuesta = {
+            "id_solicitud": id_solicitud,
+            "tipo_tramite": datos[0],
+            "alumno": {
+                "nombre_completo": f"{datos[11]} {datos[12]}",
+                "numero_cuenta": datos[13]
+            },
+            "fecha_asignacion": datos[3],
+            "documento": None,
+            "detalles_recurso": {}
+        }
+
+        if datos[6]:
+            respuesta["documento"] = {
+                "folio": datos[6],
+                "qr_token": str(datos[7]),
+                "vigencia": datos[8],
+                "estado": datos[9],
+                "url_descarga": f"/documentos/descargar/{str(datos[7])}",
+            }
+
+        if datos[0] == 'locker':
+            respuesta["detalles_recurso"] = {
+                "codigo_locker": datos[4],
+                "ubicacion": datos[5]
+            }
+        elif datos[0] == 'estacionamiento':
+            cursor.execute("SELECT placas, modelo, color FROM vehiculo_solicitud WHERE id_solicitud = %s", (id_solicitud,))
+            vehiculo = cursor.fetchone()
+            if vehiculo:
+                respuesta["detalles_recurso"]["vehiculo"] = {
+                    "placas": vehiculo[0],
+                    "modelo": vehiculo[1],
+                    "color": vehiculo[2]
+                }
+
+        cursor.close()
+        conexion.close()
+        return respuesta
+
+    except HTTPException:
+        raise
     except Exception as e:
         if conexion:
             conexion.close()

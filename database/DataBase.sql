@@ -12,7 +12,6 @@ DROP TABLE IF EXISTS locker CASCADE;
 DROP TABLE IF EXISTS admin CASCADE;
 DROP TABLE IF EXISTS alumno CASCADE;
 
--- Tabla alumno 
 CREATE TABLE alumno (
     id_alumno SERIAL PRIMARY KEY,
     numero_cuenta VARCHAR(20) UNIQUE NOT NULL,
@@ -24,7 +23,6 @@ CREATE TABLE alumno (
     estado_activo BOOLEAN NOT NULL DEFAULT TRUE 
 );
 
--- Tabla admin (CORREGIDO: El correo electrónico ahora permite nulos para los guardias)
 CREATE TABLE admin (
     id_admin SERIAL PRIMARY KEY,
     numero_cuenta VARCHAR(20) UNIQUE NOT NULL, 
@@ -65,7 +63,7 @@ CREATE TABLE solicitud (
 
 CREATE TABLE vehiculo_solicitud (
     id_vehiculo SERIAL PRIMARY KEY,
-    id_solicitud INT NOT NULL UNIQUE,
+    id_solicitud INT NOT NULL, 
     placas VARCHAR(20) NOT NULL,
     modelo VARCHAR(80) NOT NULL,
     color VARCHAR(30) NOT NULL,
@@ -97,17 +95,6 @@ CREATE TABLE historial_estados (
     CONSTRAINT fk_historial_admin FOREIGN KEY (id_admin) REFERENCES admin(id_admin)
 );
 
-CREATE TABLE revision (
-    id_revision SERIAL PRIMARY KEY,
-    id_solicitud INT NOT NULL,
-    id_admin INT NOT NULL,
-    fecha_revision TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    resultado VARCHAR(20) NOT NULL,
-    observacion TEXT,
-    CONSTRAINT fk_revision_solicitud FOREIGN KEY (id_solicitud) REFERENCES solicitud(id_solicitud),
-    CONSTRAINT fk_revision_admin FOREIGN KEY (id_admin) REFERENCES admin(id_admin)
-);
-
 CREATE TABLE asignacion (
     id_asignacion SERIAL PRIMARY KEY,
     id_solicitud INT NOT NULL UNIQUE,
@@ -119,7 +106,6 @@ CREATE TABLE asignacion (
 );
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
 CREATE TABLE constancia (
     id_constancia SERIAL PRIMARY KEY,
     id_asignacion INT NOT NULL UNIQUE,
@@ -149,12 +135,17 @@ CREATE TABLE auditoria_acceso (
     fecha_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     identidad_confirmada BOOLEAN NOT NULL,
     vehiculo_coincide BOOLEAN NOT NULL,
+    motivo TEXT,
+    evidencia_path VARCHAR(150),
     CONSTRAINT fk_acceso_guardia FOREIGN KEY (id_guardia) REFERENCES admin(id_admin),
     CONSTRAINT fk_acceso_asignacion FOREIGN KEY (id_asignacion) REFERENCES asignacion(id_asignacion)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_solicitud_activa_por_alumno ON solicitud (id_alumno, tipo_tramite) WHERE estado IN ('PENDIENTE', 'EN_REVISION', 'APROBADA', 'DOCUMENTACION_INCORRECTA');
+CREATE UNIQUE INDEX IF NOT EXISTS uq_solicitud_activa_locker ON solicitud (id_alumno, tipo_tramite) 
+WHERE tipo_tramite = 'locker' AND estado IN ('DATOS_INCOMPLETOS', 'PENDIENTE', 'EN_REVISION', 'APROBADA', 'DOCUMENTACION_INCORRECTA', 'REPOSICION');
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_asignacion_activa_por_locker ON asignacion (id_locker) WHERE estado = 'ACTIVA' AND id_locker IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_busqueda_solicitud_alumno ON solicitud(id_alumno);
 CREATE INDEX IF NOT EXISTS idx_busqueda_solicitud_estado ON solicitud(estado);
 CREATE INDEX IF NOT EXISTS idx_notif_cuenta ON notificaciones(numero_cuenta);

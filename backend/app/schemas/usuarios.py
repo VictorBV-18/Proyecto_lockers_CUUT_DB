@@ -13,15 +13,12 @@ CARRERAS_VALIDAS = [
 
 ROLES_VALIDOS = ["ADMIN", "REVISOR", "VIGILANTE"]
 
-class UsuarioBase(BaseModel):
+class AlumnoCrear(BaseModel):
     numero_cuenta: str
     nombre: str
     apellidos: str
-    correo_electronico: EmailStr
-    contrasena: str
-
-class AlumnoCrear(UsuarioBase):
     carrera: str
+    correo_electronico: EmailStr
 
     @validator('carrera')
     def validar_carrera(cls, v):

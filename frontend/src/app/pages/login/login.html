@@ -21,11 +21,7 @@
   <main class="card">
     <header class="card__brand">
       <div class="logo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M22 10 12 5 2 10l10 5 10-5Z" />
-          <path d="M6 12v5c0 1 2.7 2.5 6 2.5s6-1.5 6-2.5v-5" />
-        </svg>
+        <img src="logoUaemex.svg" alt="Logo UAEMex Tianguistenco" />
       </div>
       <h1 class="logo-title">Portal Estudiantil</h1>
       <p class="logo-subtitle">Centro Universitario UAEMex Tianguistenco</p>
@@ -43,8 +39,8 @@
           <span class="input__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
                  stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
-              <path d="m3 6 9 7 9-7" />
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 21c0-4 3.5-7 8-7s8 3 8 7" />
             </svg>
           </span>
           <input
@@ -90,7 +86,7 @@
         </div>
       </div>
 
-      <a href="#" class="forgot">Olvidé mi contraseña</a>
+      <a class="forgot" role="button" tabindex="0" (click)="olvidoContrasena()">Olvidé mi contraseña</a>
 
       <button type="submit" class="btn-login">
         <span>Iniciar Sesión</span>
@@ -102,15 +98,5 @@
         </svg>
       </button>
     </form>
-
-    <footer class="card__footer">
-      <div class="ssl">
-        <span class="ssl__avatar" aria-hidden="true"></span>
-        <div class="ssl__text">
-          <p class="ssl__title">Acceso Seguro SSL</p>
-          <p class="ssl__copy">© 2024 Universidad Global</p>
-        </div>
-      </div>
-    </footer>
   </main>
 </div>

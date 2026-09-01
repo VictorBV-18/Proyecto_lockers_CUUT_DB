@@ -34,4 +34,12 @@ export class Login {
   togglePassword() {
     this.mostrarPassword = !this.mostrarPassword;
   }
+
+  olvidoContrasena() {
+    Swal.fire({
+      icon: 'info',
+      title: 'Recuperar contraseña',
+      text: 'Contacta al administrador del sistema para restablecer tu contraseña.',
+    });
+  }
 }

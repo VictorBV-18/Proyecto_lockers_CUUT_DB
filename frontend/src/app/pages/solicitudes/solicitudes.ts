@@ -1,10 +1,13 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { PersonalService } from '../../../core/service/personal-service';
 import { AdminService } from '../../../core/service/admin-service';
-import { Solicitud, SolicitudDetalleRevisor } from '../../../core/interfaces/personalinterfaces';
+import { Solicitud, SolicitudDetalleRevisor, DocumentoRevisor } from '../../../core/interfaces/personalinterfaces';
 import { AceptarSolicitudResponse, LockerItem } from '../../../core/interfaces/admin-interfaces';
-import { claseEstado, formatearFecha } from '../../../helpers/helpers';
+import { claseEstado, descargarBlob, formatearFecha } from '../../../helpers/helpers';
 import Swal from 'sweetalert2';
+
+const EXTENSIONES_IMAGEN = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 
 @Component({
   selector: 'app-solicitudes',
@@ -15,6 +18,7 @@ import Swal from 'sweetalert2';
 export class Solicitudes {
   peticionesPersonal = inject(PersonalService);
   private adminService = inject(AdminService);
+  private sanitizer = inject(DomSanitizer);
 
   idAdmin = Number(localStorage.getItem('idAdmin')) || 0;
 
@@ -38,6 +42,8 @@ export class Solicitudes {
       return true;
     });
   });
+
+  exportandoExcel = signal(false);
 
   hayFiltrosActivos = computed(() =>
     !!this.filtroTipo() || !!this.filtroEstado() || !!this.filtroFecha()
@@ -63,8 +69,16 @@ export class Solicitudes {
   cargandoModal      = signal(false);
   solicitudDetalle   = signal<SolicitudDetalleRevisor | null>(null);
 
+  // Bloqueo de revisión: evita que dos admins trabajen la misma solicitud a la vez.
+  bloqueadaPorOtroAdmin = signal(false);
+  private revisionAdquirida = false;
+
   rechazandoDoc      = signal<Record<number, boolean>>({});
   procesandoDoc      = signal<Record<number, boolean>>({});
+
+  // Vista previa del documento subido por el alumno
+  docEnPreview       = signal<DocumentoRevisor | null>(null);
+  previewUrl         = signal<SafeResourceUrl | null>(null);
 
   accionSolicitud    = signal<'idle' | 'seleccionando-locker' | 'confirmando-estacionamiento' | 'rechazando'>('idle');
   lockersDisponibles = signal<LockerItem[]>([]);
@@ -110,6 +124,7 @@ export class Solicitudes {
   mostrarPanelAccion = computed(() => {
     const det = this.solicitudDetalle();
     if (!det || det.estado === 'APROBADA') return false;
+    if (this.bloqueadaPorOtroAdmin()) return false;
     return !this.solicitudFinalizada() && (this.todosAprobados() || this.hayRechazado());
   });
 
@@ -130,12 +145,15 @@ export class Solicitudes {
     this.rechazandoDoc.set({});
     this.procesandoDoc.set({});
     this.motivoRechazo = {};
+    this.bloqueadaPorOtroAdmin.set(false);
+    this.revisionAdquirida = false;
     this.resetAccionSolicitud();
 
     this.peticionesPersonal.obtenerDetalleSolicitud(sol.id_solicitud).subscribe({
       next: (detalle) => {
         this.solicitudDetalle.set(detalle);
         this.cargandoModal.set(false);
+        this.intentarMarcarEnRevision(detalle);
       },
       error: () => {
         this.cargandoModal.set(false);
@@ -144,7 +162,32 @@ export class Solicitudes {
     });
   }
 
+  // Solo tiene sentido bloquear solicitudes aún no resueltas (así lo valida también el backend).
+  private intentarMarcarEnRevision(detalle: SolicitudDetalleRevisor): void {
+    if (detalle.estado !== 'PENDIENTE' && detalle.estado !== 'REPOSICION') return;
+
+    this.peticionesPersonal.marcarEnRevision(detalle.id_solicitud, this.idAdmin).subscribe({
+      next: (resp) => {
+        if (resp.nuevo_estado === 'EN_REVISION') {
+          this.revisionAdquirida = true;
+        } else {
+          // El backend no cambió el estado: otro admin ya la tiene en revisión.
+          this.bloqueadaPorOtroAdmin.set(true);
+        }
+      },
+      error: () => {
+        // Si la petición falla no asumimos que se adquirió el bloqueo en el backend.
+      },
+    });
+  }
+
   cerrarModal(): void {
+    const det = this.solicitudDetalle();
+    if (this.revisionAdquirida && det) {
+      this.peticionesPersonal.cancelarRevision(det.id_solicitud).subscribe({ error: () => {} });
+    }
+    this.revisionAdquirida = false;
+
     this.modalAbierto.set(false);
     this.solicitudDetalle.set(null);
     this.rechazandoDoc.set({});
@@ -152,7 +195,26 @@ export class Solicitudes {
     this.motivoRechazo = {};
     this.documentoGenerado.set(null);
     this.mesesVigencia = 4;
+    this.bloqueadaPorOtroAdmin.set(false);
     this.resetAccionSolicitud();
+    this.cerrarPreviewDoc();
+  }
+
+  // ── Vista previa de documento ─────────────────────────────────
+  esImagenDoc(archivo: string): boolean {
+    const extension = archivo.split('.').pop()?.toLowerCase() ?? '';
+    return EXTENSIONES_IMAGEN.includes(extension);
+  }
+
+  abrirPreviewDoc(doc: DocumentoRevisor): void {
+    const url = this.peticionesPersonal.obtenerUrlDocumento(doc.id_documento);
+    this.previewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(url));
+    this.docEnPreview.set(doc);
+  }
+
+  cerrarPreviewDoc(): void {
+    this.docEnPreview.set(null);
+    this.previewUrl.set(null);
   }
 
   private resetAccionSolicitud(): void {
@@ -398,6 +460,25 @@ export class Solicitudes {
       error: (err) => {
         this.procesandoAceptar.set(false);
         Swal.fire({ icon: 'error', title: err?.error?.detail || 'Error al generar el documento', timer: 2500, showConfirmButton: false });
+      },
+    });
+  }
+
+  exportarExcel(): void {
+    this.exportandoExcel.set(true);
+    this.adminService.exportarAuditoriaSolicitudesExcel().subscribe({
+      next: (blob) => {
+        descargarBlob(blob, 'Registro_de_auditoria_solicitudes_CUUT.xlsx');
+        this.exportandoExcel.set(false);
+      },
+      error: () => {
+        this.exportandoExcel.set(false);
+        Swal.fire({
+          icon: 'error',
+          title: 'No se pudo generar el archivo Excel.',
+          timer: 2200,
+          showConfirmButton: false,
+        });
       },
     });
   }
