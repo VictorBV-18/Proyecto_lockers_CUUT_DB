@@ -1033,3 +1033,198 @@ def ver_documento_subido(id_documento: int):
         if conexion:
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
+
+
+
+# ==============================================================================
+# AUDITORÍA DE ACCESOS, STRIKES Y APELACIONES
+# ==============================================================================
+
+@router.put("/admin/usuarios/{numero_cuenta}/desbloquear-acceso", tags=["Administrador / Personal"], summary="Desbloquear alumno por apelación y perdonar el strike más reciente")
+def desbloquear_acceso_alumno(numero_cuenta: str):
+    """
+    Desbloquea el acceso del alumno y elimina su strike más reciente (por ejemplo, de 3 pasa a 2).
+    """
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+
+        # 1. Obtener el ID del alumno
+        cursor.execute("SELECT id_alumno FROM alumno WHERE numero_cuenta = %s;", (numero_cuenta,))
+        alumno = cursor.fetchone()
+        if not alumno:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=404, detail="Alumno no encontrado.")
+
+        id_alumno = alumno[0]
+
+        # 2. Localizar y borrar el registro denegado (strike) más reciente
+        cursor.execute("""
+            DELETE FROM acceso_denegado 
+            WHERE id_acceso = (
+                SELECT id_acceso 
+                FROM acceso_denegado 
+                WHERE id_alumno = %s 
+                ORDER BY fecha_intento DESC 
+                LIMIT 1
+            )
+            RETURNING id_acceso;
+        """, (id_alumno,))
+        strike_eliminado = cursor.fetchone()
+
+        # 3. Reactivar el estado del alumno
+        cursor.execute("UPDATE alumno SET estado_activo = TRUE WHERE id_alumno = %s;", (id_alumno,))
+
+        # 4. Contar cuántos strikes le quedan
+        cursor.execute("SELECT COUNT(*) FROM acceso_denegado WHERE id_alumno = %s;", (id_alumno,))
+        strikes_restantes = cursor.fetchone()[0]
+
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+
+        return {
+            "mensaje": "Acceso desbloqueado y apelación aplicada con éxito.",
+            "numero_cuenta": numero_cuenta,
+            "strike_eliminado_id": strike_eliminado[0] if strike_eliminado else None,
+            "strikes_restantes": strikes_restantes,
+            "estado_activo": True
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+
+@router.delete("/admin/usuarios/{numero_cuenta}/strikes/{id_acceso}", tags=["Administrador / Personal"], summary="Borrar un strike específico de un alumno por ID de acceso")
+def borrar_strike_individual(numero_cuenta: str, id_acceso: int):
+    """
+    Permite al administrador eliminar un strike puntual a un alumno indicando su número de cuenta y el ID del acceso denegado.
+    """
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+
+        # Verificar que el registro pertenezca al alumno indicado
+        cursor.execute("""
+            SELECT ad.id_acceso 
+            FROM acceso_denegado ad
+            JOIN alumno a ON ad.id_alumno = a.id_alumno
+            WHERE a.numero_cuenta = %s AND ad.id_acceso = %s;
+        """, (numero_cuenta, id_acceso))
+
+        if not cursor.fetchone():
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=404, detail="El strike no existe o no corresponde al número de cuenta especificado.")
+
+        # Eliminar el strike específico
+        cursor.execute("DELETE FROM acceso_denegado WHERE id_acceso = %s;", (id_acceso,))
+        
+        # Contar los strikes que le quedan
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM acceso_denegado ad
+            JOIN alumno a ON ad.id_alumno = a.id_alumno
+            WHERE a.numero_cuenta = %s;
+        """, (numero_cuenta,))
+        strikes_restantes = cursor.fetchone()[0]
+
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+
+        return {
+            "mensaje": f"Strike #{id_acceso} eliminado exitosamente.",
+            "numero_cuenta": numero_cuenta,
+            "strikes_restantes": strikes_restantes
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+
+@router.get("/admin/auditoria/accesos-denegados/{numero_cuenta}", tags=["Administrador / Personal"], summary="Listar accesos denegados/strikes por alumno con paginación de 20 en 20")
+def listar_accesos_denegados_alumno(numero_cuenta: str, page: int = 1):
+    """
+    Obtiene el historial de accesos denegados de un alumno dividido en bloques de 20 registros por página.
+    """
+    registros_por_pagina = 20
+    offset = (page - 1) * registros_por_pagina
+
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+
+        cursor.execute("SELECT id_alumno, nombre, apellidos FROM alumno WHERE numero_cuenta = %s;", (numero_cuenta,))
+        alumno = cursor.fetchone()
+        if not alumno:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=404, detail="Alumno no encontrado.")
+
+        id_alumno, nombre, apellidos = alumno[0], alumno[1], alumno[2]
+
+        # Conteo total
+        cursor.execute("SELECT COUNT(*) FROM acceso_denegado WHERE id_alumno = %s;", (id_alumno,))
+        total_registros = cursor.fetchone()[0]
+
+        # Consulta paginada
+        cursor.execute("""
+            SELECT id_acceso, motivo, fecha_intento 
+            FROM acceso_denegado
+            WHERE id_alumno = %s
+            ORDER BY fecha_intento DESC
+            LIMIT %s OFFSET %s;
+        """, (id_alumno, registros_por_pagina, offset))
+        filas = cursor.fetchall()
+
+        cursor.close()
+        conexion.close()
+
+        historial = [
+            {
+                "id_acceso": fila[0],
+                "motivo": fila[1],
+                "fecha_intento": fila[2]
+            }
+            for fila in filas
+        ]
+
+        total_paginas = math.ceil(total_registros / registros_por_pagina) if total_registros > 0 else 1
+
+        return {
+            "numero_cuenta": numero_cuenta,
+            "alumno": f"{nombre} {apellidos}",
+            "pagina_actual": page,
+            "registros_por_pagina": registros_por_pagina,
+            "total_strikes": total_registros,
+            "total_paginas": total_paginas,
+            "resultados": historial
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conexion:
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
