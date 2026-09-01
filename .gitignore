@@ -1,8 +1,21 @@
+# Variables de entorno y credenciales (Muy importante)
+.env
+backend/.env
+
+# Entornos virtuales de Python
 backend/venv/
+venv/
+
+# Archivos compilados de Python
 backend/app/__pycache__/
 backend/app/api/__pycache__/
 backend/app/db/__pycache__/
+backend/app/utils/__pycache__/
 *.pyc
+__pycache__/
+
+# Dependencias de Frontend
 frontend/node_modules/
 
+# Archivos temporales o subidos
 backend/uploads/
