@@ -151,3 +151,26 @@ CREATE INDEX IF NOT EXISTS idx_busqueda_solicitud_estado ON solicitud(estado);
 CREATE INDEX IF NOT EXISTS idx_notif_cuenta ON notificaciones(numero_cuenta);
 CREATE INDEX IF NOT EXISTS idx_notif_rol ON notificaciones(rol_destino);
 CREATE INDEX IF NOT EXISTS idx_qr_token ON constancia(qr_token);
+
+
+
+
+-- Asegurar columnas de seguridad en admin y alumno
+ALTER TABLE admin 
+ADD COLUMN IF NOT EXISTS correo_electronico VARCHAR(150),  
+ADD COLUMN IF NOT EXISTS contrasena_hash VARCHAR(255),
+ADD COLUMN IF NOT EXISTS estado_activo BOOLEAN DEFAULT TRUE;
+
+ALTER TABLE alumno 
+ADD COLUMN IF NOT EXISTS correo_electronico VARCHAR(150),
+ADD COLUMN IF NOT EXISTS contrasena_hash VARCHAR(255),
+ADD COLUMN IF NOT EXISTS estado_activo BOOLEAN DEFAULT TRUE;
+
+-- Tabla para el control de accesos denegados y strikes
+CREATE TABLE IF NOT EXISTS acceso_denegado (
+    id_acceso SERIAL PRIMARY KEY,
+    id_alumno INTEGER NOT NULL REFERENCES alumno(id_alumno) ON DELETE CASCADE,
+    motivo VARCHAR(255) NOT NULL,
+    fecha_intento TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+

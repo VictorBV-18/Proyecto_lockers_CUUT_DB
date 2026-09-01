@@ -1,22 +1,34 @@
-from fastapi import APIRouter, HTTPException
+import os
+import io
+import math
+import random
+import pandas as pd
+from enum import Enum
+from datetime import datetime
 from pydantic import BaseModel
-from app.db.conexion import conectar_base
-from app.utils.notificaciones import enviar_correo_rechazo, enviar_correo_documento, generar_password_seguro, enviar_correo_credenciales, enviar_correo_desbloqueo
-from enum import Enum 
-from datetime import datetime, timedelta
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
+
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.drawing.image import Image as OpenpyxlImage
+
+from app.db.conexion import conectar_base
 from app.utils.generador_pdf import generar_documento
 from app.schemas.usuarios import AlumnoCrear, PersonalCrear
 from app.utils.seguridad import obtener_hash_contrasena
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.drawing.image import Image as OpenpyxlImage
-import math
-import io
-import os
-import pandas as pd
-import random
+from app.utils.notificaciones import (
+    enviar_correo_rechazo,
+    enviar_correo_documento,
+    generar_password_seguro,
+    enviar_correo_credenciales,
+    enviar_correo_desbloqueo
+)
 
 router = APIRouter()
+
+# ==============================================================================
+# SCHEMAS PYDANTIC
+# ==============================================================================
 
 class CambioEstadoUsuario(BaseModel):
     numero_cuenta: str
@@ -59,6 +71,11 @@ class GuardiaCrear(BaseModel):
 class ApelacionBloqueo(BaseModel):
     id_admin: int
     comentario: str   
+
+
+# ==============================================================================
+# GESTIÓN Y REVISIÓN DE SOLICITUDES
+# ==============================================================================
 
 @router.get("/solicitudes/{id_solicitud}/detalle", tags=["Administrador / Personal"], summary="Obtener documentos de una solicitud completa para revisión")
 def obtener_detalle_solicitud(id_solicitud: int):
@@ -127,6 +144,7 @@ def obtener_detalle_solicitud(id_solicitud: int):
         if conexion:
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
 
 @router.get("/solicitudes/", tags=["Administrador / Personal"], summary="Obtener todas las solicitudes de los alumnos")
 def obtener_todas_las_solicitudes(
@@ -218,6 +236,7 @@ def obtener_todas_las_solicitudes(
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
+
 @router.put("/solicitudes/{id_solicitud}/documentos/{id_documento}", tags=["Administrador / Personal"], summary="Evaluar documento individualmente de cada solicitud")
 def evaluar_documento_individual(
     id_solicitud: int,
@@ -280,6 +299,7 @@ def evaluar_documento_individual(
             conexion.rollback()
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
 
 @router.post("/solicitudes/{id_solicitud}/rechazar", tags=["Administrador / Personal"], summary="Rechazar solicitud completa y notificar via correo electronico el motivo")
 def rechazar_solicitud(id_solicitud: int, datos: RechazarSolicitud):
@@ -365,6 +385,7 @@ def rechazar_solicitud(id_solicitud: int, datos: RechazarSolicitud):
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
+
 @router.post("/solicitudes/{id_solicitud}/aprobar-locker", tags=["Administrador / Personal"], summary="Aprobar solicitud de locker y asignarle uno al alumno")
 def aprobar_solicitud_locker(id_solicitud: int, datos: AprobarLocker):
     conexion = conectar_base()
@@ -449,6 +470,7 @@ def aprobar_solicitud_locker(id_solicitud: int, datos: AprobarLocker):
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
+
 @router.post("/solicitudes/{id_solicitud}/aprobar-estacionamiento", tags=["Administrador / Personal"], summary="Aprobar solicitud de estacionamiento")
 def aprobar_solicitud_estacionamiento(id_solicitud: int, datos: AprobarEstacionamiento):
     conexion = conectar_base()
@@ -511,6 +533,7 @@ def aprobar_solicitud_estacionamiento(id_solicitud: int, datos: AprobarEstaciona
             conexion.rollback()
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
 
 @router.post("/solicitudes/{id_solicitud}/aceptar", tags=["Administrador / Personal"], summary="Aceptar solicitud completa, notificar via correo electronico, generar constancia o tarjeton con QR y calcular caducidad semestral")
 def aceptar_solicitud_y_generar_documento(id_solicitud: int, datos: GenerarDocumentoRequest):
@@ -615,6 +638,94 @@ def aceptar_solicitud_y_generar_documento(id_solicitud: int, datos: GenerarDocum
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD/Motor: {str(e)}")
 
+
+@router.put("/solicitudes/{id_solicitud}/en-revision", tags=["Administrador / Personal"], summary="Cambiar el estado de una solicitud a EN REVISION cuando el admin la abre")
+def marcar_solicitud_en_revision(id_solicitud: int, id_admin: int):
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("SELECT estado FROM solicitud WHERE id_solicitud = %s", (id_solicitud,))
+        resultado = cursor.fetchone()
+
+        if not resultado:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+
+        estado_actual = resultado[0]
+        
+        if estado_actual not in ["PENDIENTE", "REPOSICION"]:
+            cursor.close()
+            conexion.close()
+            return {"mensaje": f"La solicitud ya se encuentra en estado {estado_actual}, no se cambió a EN_REVISION."}
+
+        cursor.execute("""
+            UPDATE solicitud 
+            SET estado = 'EN_REVISION', revisado_por = %s, fecha_revision = CURRENT_TIMESTAMP
+            WHERE id_solicitud = %s
+        """, (id_admin, id_solicitud))
+        
+        cursor.execute("""
+            INSERT INTO historial_estados (id_solicitud, estado_anterior, estado_nuevo, id_admin, comentario)
+            VALUES (%s, %s, 'EN_REVISION', %s, 'El administrador ha comenzado a revisar los documentos.')
+        """, (id_solicitud, estado_actual, id_admin))
+
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+
+        return {"mensaje": "La solicitud ahora está EN REVISIÓN.", "nuevo_estado": "EN_REVISION"}
+
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+
+@router.put("/solicitudes/{id_solicitud}/cancelar-revision", tags=["Administrador / Personal"], summary="Cancelar la revisión si el admin se sale sin hacer nada")
+def cancelar_revision(id_solicitud: int):
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("""
+            SELECT estado FROM solicitud WHERE id_solicitud = %s
+        """, (id_solicitud,))
+        res = cursor.fetchone()
+        
+        if not res:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+
+        if res[0] != 'EN_REVISION':
+            cursor.close()
+            conexion.close()
+            return {"mensaje": "No se hizo nada porque la solicitud no está en revisión."}
+
+        cursor.execute("""
+            UPDATE solicitud SET estado = 'PENDIENTE', revisado_por = NULL WHERE id_solicitud = %s
+        """, (id_solicitud,))
+        
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+
+        return {"mensaje": "La solicitud ha regresado a estado PENDIENTE."}
+
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+
 @router.get("/documentos/descargar/{qr_token}", tags=["Administrador / Personal", "Alumno"], summary="Descargar el PDF de un trámite mediante el qr_token")
 def descargar_documento(qr_token: str):
     conexion = conectar_base()
@@ -638,7 +749,7 @@ def descargar_documento(qr_token: str):
         estado = resultado[1]
         
         if estado != 'VIGENTE':
-             raise HTTPException(status_code=400, detail=f"No se puede descargar. El documento está {estado}.")
+            raise HTTPException(status_code=400, detail=f"No se puede descargar. El documento está {estado}.")
              
         ruta_completa = os.path.join("uploads", archivo_path)
         
@@ -650,11 +761,57 @@ def descargar_documento(qr_token: str):
     except HTTPException:
         raise
     except ValueError:
-         raise HTTPException(status_code=400, detail="Formato de token inválido.")
+        raise HTTPException(status_code=400, detail="Formato de token inválido.")
     except Exception as e:
         if conexion:
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
+
+
+@router.get("/solicitudes/documentos/{id_documento}/visualizar", tags=["Administrador / Personal", "Alumno"], summary="Previsualizar un documento y el nombre de forma segura sin exponer datos del alumno publicamente")
+def ver_documento_subido(id_documento: int):
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+        
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("SELECT archivo_path FROM documentos_solicitud WHERE id_documento = %s", (id_documento,))
+        resultado = cursor.fetchone()
+        
+        cursor.close()
+        conexion.close()
+        
+        if not resultado:
+            raise HTTPException(status_code=404, detail="Documento no encontrado en la base de datos.")
+            
+        archivo_path = resultado[0]
+        ruta_completa = os.path.join("uploads", archivo_path)
+        
+        if not os.path.exists(ruta_completa):
+            raise HTTPException(status_code=404, detail="El archivo físico ya no existe en el servidor.")
+            
+        extension = archivo_path.lower().split('.')[-1]
+        media_type = "application/pdf" if extension == "pdf" else f"image/{extension}"
+            
+        return FileResponse(
+            path=ruta_completa, 
+            media_type=media_type, 
+            filename=archivo_path,
+            content_disposition_type="inline" 
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conexion:
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
+
+
+# ==============================================================================
+# ADMINISTRACIÓN DE USUARIOS
+# ==============================================================================
 
 @router.post("/admin/usuarios/alumno", tags=["Administrador / Personal"], summary="Crear cuenta del Alumno, autogenerando contraseña y enviando correo")
 def crear_cuenta_alumno(datos: AlumnoCrear):
@@ -691,6 +848,7 @@ def crear_cuenta_alumno(datos: AlumnoCrear):
             raise HTTPException(status_code=400, detail="El número de cuenta ya está registrado.")
         raise HTTPException(status_code=500, detail=f"Error en BD/Servidor: {str(e)}")
 
+
 @router.post("/admin/usuarios/personal", tags=["Administrador / Personal"], summary="Crear una cuenta unicamente del Administrador o Personal")
 def crear_cuenta_personal(datos: PersonalCrear):
     conexion = conectar_base()
@@ -723,54 +881,45 @@ def crear_cuenta_personal(datos: PersonalCrear):
             raise HTTPException(status_code=400, detail="El número de cuenta ya está registrado.")
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
-@router.get("/admin/estadisticas/dashboard", tags=["Administrador / Personal"], summary="Obtener estadísticas para el dashboard")
-def obtener_estadisticas_dashboard():
+
+@router.post("/admin/usuarios/guardia", tags=["Administrador / Personal"], summary="Crear cuenta del Guardia autogenerando cuenta y contraseña")
+def crear_cuenta_guardia(datos: GuardiaCrear):
     conexion = conectar_base()
     if conexion is None:
         raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    numero_cuenta_guardia = f"900{random.randint(1000, 9999)}"
+    password_plana = generar_password_seguro()
+    hash_password = obtener_hash_contrasena(password_plana)
+
     try:
         cursor = conexion.cursor()
         cursor.execute("""
-            SELECT 
-                COUNT(*) as total,
-                COUNT(*) FILTER (WHERE estado IN ('PENDIENTE', 'EN_REVISION')) as pendientes,
-                COUNT(*) FILTER (WHERE estado = 'APROBADA') as aprobadas,
-                COUNT(*) FILTER (WHERE estado = 'DOCUMENTACION_INCORRECTA') as rechazadas
-            FROM solicitud;
-        """)
-        sol_stats = cursor.fetchone()
+            INSERT INTO admin (numero_cuenta, nombre, apellidos, correo_electronico, contrasena_hash, rol, estado_activo)
+            VALUES (%s, %s, %s, %s, %s, 'VIGILANTE', TRUE)
+            RETURNING id_admin;
+        """, (numero_cuenta_guardia, datos.nombre, datos.apellidos, datos.correo_electronico, hash_password))
         
-        cursor.execute("""
-            SELECT 
-                COUNT(*) as total,
-                COUNT(*) FILTER (WHERE estado = 'DISPONIBLE') as disponibles,
-                COUNT(*) FILTER (WHERE estado = 'OCUPADO') as ocupados,
-                COUNT(*) FILTER (WHERE estado = 'MANTENIMIENTO') as mantenimiento
-            FROM locker;
-        """)
-        lock_stats = cursor.fetchone()
+        id_nuevo = cursor.fetchone()[0]
+        conexion.commit()
+        
+        nombre_completo = f"{datos.nombre} {datos.apellidos}"
+        enviar_correo_credenciales(datos.correo_electronico, nombre_completo, numero_cuenta_guardia, password_plana, "Guardia de Seguridad")
         
         cursor.close()
         conexion.close()
-        
         return {
-            "solicitudes": {
-                "total": sol_stats[0],
-                "pendientes": sol_stats[1],
-                "aprobadas": sol_stats[2],
-                "rechazadas": sol_stats[3]
-            },
-            "lockers": {
-                "total": lock_stats[0],
-                "disponibles": lock_stats[1],
-                "ocupados": lock_stats[2],
-                "mantenimiento": lock_stats[3]
-            }
+            "mensaje": f"Guardia creado exitosamente. Se le envió su número de cuenta ({numero_cuenta_guardia}) y contraseña a su correo.", 
+            "id_admin": id_nuevo,
+            "numero_cuenta_generado": numero_cuenta_guardia
         }
+
     except Exception as e:
         if conexion:
+            conexion.rollback()
             conexion.close()
-        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en BD/Servidor: {str(e)}")
+
 
 @router.get("/admin/usuarios", tags=["Administrador / Personal"], summary="Obtener lista de usuarios dentro del sistema separados con filtros y mediante bloques de datos de 20 en 20")
 def listar_usuarios(
@@ -853,6 +1002,7 @@ def listar_usuarios(
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
     
+
 @router.put("/admin/usuarios/estado", tags=["Administrador / Personal"], summary="Activar, desactivar o bloquear una cuenta")
 def cambiar_estado_usuario(datos: CambioEstadoUsuario):
     conexion = conectar_base()
@@ -896,6 +1046,7 @@ def cambiar_estado_usuario(datos: CambioEstadoUsuario):
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
     
+
 @router.put("/admin/usuarios/rol", tags=["Administrador / Personal"], summary="Cambiar el rol de cualquier usuario")
 def cambiar_rol_personal(datos: CambioRol):
     rol_upper = datos.nuevo_rol.upper()
@@ -932,45 +1083,226 @@ def cambiar_rol_personal(datos: CambioRol):
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
-@router.get("/solicitudes/documentos/{id_documento}/visualizar", tags=["Administrador / Personal", "Alumno"], summary="Previsualizar un documento y el nombre de forma segura sin exponer datos del alumno publicamente")
-def ver_documento_subido(id_documento: int):
+
+# ==============================================================================
+# AUDITORÍA, STRIKES, APELACIONES Y EXCEL
+# ==============================================================================
+
+@router.put("/admin/usuarios/{numero_cuenta}/desbloquear-acceso", tags=["Administrador / Personal"], summary="Desbloquear cuenta de alumno y restaurar permisos por apelación")
+def desbloquear_acceso_alumno(numero_cuenta: str, datos: ApelacionBloqueo):
     conexion = conectar_base()
     if conexion is None:
         raise HTTPException(status_code=500, detail="Error de conexión a la BD")
-        
+
     try:
         cursor = conexion.cursor()
-        cursor.execute("SELECT archivo_path FROM documentos_solicitud WHERE id_documento = %s", (id_documento,))
-        resultado = cursor.fetchone()
         
+        cursor.execute("SELECT id_alumno, nombre, apellidos, correo_electronico FROM alumno WHERE numero_cuenta = %s", (numero_cuenta,))
+        alumno_bd = cursor.fetchone()
+        
+        if not alumno_bd:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=404, detail="Alumno no encontrado.")
+            
+        id_alumno = alumno_bd[0]
+        nombre_completo = f"{alumno_bd[1]} {alumno_bd[2]}"
+        correo_electronico = alumno_bd[3]
+
+        cursor.execute("UPDATE alumno SET estado_activo = TRUE WHERE id_alumno = %s", (id_alumno,))
+        
+        cursor.execute("""
+            UPDATE asignacion a
+            SET estado = 'ACTIVA'
+            FROM solicitud s
+            WHERE a.id_solicitud = s.id_solicitud 
+              AND s.id_alumno = %s 
+              AND a.estado = 'BLOQUEADA'
+            RETURNING s.id_solicitud
+        """, (id_alumno,))
+        solicitudes_restauradas = cursor.fetchall()
+
+        cursor.execute("""
+            UPDATE constancia c
+            SET estado = 'VIGENTE'
+            FROM asignacion a, solicitud s
+            WHERE c.id_asignacion = a.id_asignacion
+              AND a.id_solicitud = s.id_solicitud
+              AND s.id_alumno = %s
+              AND c.estado = 'BLOQUEADO'
+        """, (id_alumno,))
+        
+        # Eliminar el strike más reciente en acceso_denegado si existe la tabla
+        cursor.execute("""
+            DELETE FROM acceso_denegado 
+            WHERE id_acceso = (
+                SELECT id_acceso 
+                FROM acceso_denegado 
+                WHERE id_alumno = %s 
+                ORDER BY fecha_intento DESC 
+                LIMIT 1
+            );
+        """, (id_alumno,))
+        
+        for sol in solicitudes_restauradas:
+            cursor.execute("""
+                INSERT INTO historial_estados (id_solicitud, estado_anterior, estado_nuevo, id_admin, comentario)
+                VALUES (%s, 'BLOQUEADA', 'APROBADA', %s, %s)
+            """, (sol[0], datos.id_admin, f"Desbloqueo por apelación: {datos.comentario}"))
+            
+        cursor.execute("""
+            UPDATE auditoria_acceso au
+            SET motivo = motivo || ' [APELADO Y PERDONADO]'
+            FROM asignacion a, solicitud s
+            WHERE au.id_asignacion = a.id_asignacion 
+              AND a.id_solicitud = s.id_solicitud
+              AND s.id_alumno = %s
+              AND (au.identidad_confirmada = FALSE OR au.vehiculo_coincide = FALSE)
+        """, (id_alumno,))
+        
+        cursor.execute("""
+            INSERT INTO notificaciones (numero_cuenta, rol_destino, titulo, mensaje)
+            VALUES (%s, 'ALUMNO', 'Cuenta Restaurada', 'Tu apelación fue aceptada. Tu cuenta y permiso están activos nuevamente.')
+        """, (numero_cuenta,))
+
+        conexion.commit()
+        correo_enviado = enviar_correo_desbloqueo(correo_electronico, nombre_completo)
+
         cursor.close()
         conexion.close()
         
-        if not resultado:
-            raise HTTPException(status_code=404, detail="Documento no encontrado en la base de datos.")
-            
-        archivo_path = resultado[0]
-        ruta_completa = os.path.join("uploads", archivo_path)
+        mensaje_final = "El alumno y sus permisos han sido desbloqueados exitosamente."
+        if not correo_enviado:
+            mensaje_final += " (Advertencia: Falló el envío del correo de notificación)."
+
+        return {
+            "mensaje": mensaje_final,
+            "numero_cuenta": numero_cuenta,
+            "permisos_restaurados": len(solicitudes_restauradas)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+
+@router.delete("/admin/usuarios/{numero_cuenta}/strikes/{id_acceso}", tags=["Administrador / Personal"], summary="Borrar un strike específico de un alumno por ID de acceso")
+def borrar_strike_individual(numero_cuenta: str, id_acceso: int):
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("""
+            SELECT ad.id_acceso 
+            FROM acceso_denegado ad
+            JOIN alumno a ON ad.id_alumno = a.id_alumno
+            WHERE a.numero_cuenta = %s AND ad.id_acceso = %s;
+        """, (numero_cuenta, id_acceso))
+
+        if not cursor.fetchone():
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=404, detail="El strike no existe o no corresponde al número de cuenta especificado.")
+
+        cursor.execute("DELETE FROM acceso_denegado WHERE id_acceso = %s;", (id_acceso,))
         
-        if not os.path.exists(ruta_completa):
-            raise HTTPException(status_code=404, detail="El archivo físico ya no existe en el servidor.")
-            
-        extension = archivo_path.lower().split('.')[-1]
-        media_type = "application/pdf" if extension == "pdf" else f"image/{extension}"
-            
-        return FileResponse(
-            path=ruta_completa, 
-            media_type=media_type, 
-            filename=archivo_path,
-            content_disposition_type="inline" 
-        )
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM acceso_denegado ad
+            JOIN alumno a ON ad.id_alumno = a.id_alumno
+            WHERE a.numero_cuenta = %s;
+        """, (numero_cuenta,))
+        strikes_restantes = cursor.fetchone()[0]
+
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+
+        return {
+            "mensaje": f"Strike #{id_acceso} eliminado exitosamente.",
+            "numero_cuenta": numero_cuenta,
+            "strikes_restantes": strikes_restantes
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+            conexion.close()
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+
+@router.get("/admin/auditoria/accesos-denegados/{numero_cuenta}", tags=["Administrador / Personal"], summary="Listar accesos denegados/strikes por alumno con paginación de 20 en 20")
+def listar_accesos_denegados_alumno(numero_cuenta: str, page: int = 1):
+    registros_por_pagina = 20
+    offset = (page - 1) * registros_por_pagina
+
+    conexion = conectar_base()
+    if conexion is None:
+        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
+
+    try:
+        cursor = conexion.cursor()
+
+        cursor.execute("SELECT id_alumno, nombre, apellidos FROM alumno WHERE numero_cuenta = %s;", (numero_cuenta,))
+        alumno = cursor.fetchone()
+        if not alumno:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=404, detail="Alumno no encontrado.")
+
+        id_alumno, nombre, apellidos = alumno[0], alumno[1], alumno[2]
+
+        cursor.execute("SELECT COUNT(*) FROM acceso_denegado WHERE id_alumno = %s;", (id_alumno,))
+        total_registros = cursor.fetchone()[0]
+
+        cursor.execute("""
+            SELECT id_acceso, motivo, fecha_intento 
+            FROM acceso_denegado
+            WHERE id_alumno = %s
+            ORDER BY fecha_intento DESC
+            LIMIT %s OFFSET %s;
+        """, (id_alumno, registros_por_pagina, offset))
+        filas = cursor.fetchall()
+
+        cursor.close()
+        conexion.close()
+
+        historial = [
+            {
+                "id_acceso": fila[0],
+                "motivo": fila[1],
+                "fecha_intento": fila[2]
+            }
+            for fila in filas
+        ]
+
+        total_paginas = math.ceil(total_registros / registros_por_pagina) if total_registros > 0 else 1
+
+        return {
+            "numero_cuenta": numero_cuenta,
+            "alumno": f"{nombre} {apellidos}",
+            "pagina_actual": page,
+            "registros_por_pagina": registros_por_pagina,
+            "total_strikes": total_registros,
+            "total_paginas": total_paginas,
+            "resultados": historial
+        }
 
     except HTTPException:
         raise
     except Exception as e:
         if conexion:
             conexion.close()
-        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
 
 @router.get("/admin/guardia/auditoria-accesos", tags=["Administrador / Personal"], summary="Ver historial de accesos registrados por los guardias separado por bloques de 20 en 20")
 def ver_auditoria_accesos(page: int = 1):
@@ -1053,128 +1385,160 @@ def ver_auditoria_accesos(page: int = 1):
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
-@router.post("/admin/usuarios/guardia", tags=["Administrador / Personal"], summary="Crear cuenta del Guardia autogenerando cuenta y contraseña")
-def crear_cuenta_guardia(datos: GuardiaCrear):
+
+@router.get("/admin/auditoria/evidencia-accesos-denegados/{numero_cuenta}", tags=["Administrador / Personal"], summary="Consultar evidencia de accesos denegados en caso de apelacion de un alumno")
+def consultar_evidencias_apelacion(numero_cuenta: str):
     conexion = conectar_base()
     if conexion is None:
         raise HTTPException(status_code=500, detail="Error de conexión a la BD")
 
-    numero_cuenta_guardia = f"900{random.randint(1000, 9999)}"
-    password_plana = generar_password_seguro()
-    hash_password = obtener_hash_contrasena(password_plana)
-
     try:
         cursor = conexion.cursor()
+        cursor.execute("SELECT id_alumno FROM alumno WHERE numero_cuenta = %s", (numero_cuenta,))
+        al_bd = cursor.fetchone()
+        
+        if not al_bd:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(status_code=404, detail="Alumno no encontrado")
+            
+        id_alumno = al_bd[0]
+
         cursor.execute("""
-            INSERT INTO admin (numero_cuenta, nombre, apellidos, correo_electronico, contrasena_hash, rol, estado_activo)
-            VALUES (%s, %s, %s, %s, %s, 'VIGILANTE', TRUE)
-            RETURNING id_admin;
-        """, (numero_cuenta_guardia, datos.nombre, datos.apellidos, datos.correo_electronico, hash_password))
+            SELECT 
+                au.id_acceso,
+                TO_CHAR(au.fecha_hora, 'YYYY-MM-DD HH24:MI:SS') as fecha,
+                g.nombre || ' ' || g.apellidos AS nombre_guardia,
+                s.tipo_tramite,
+                c.folio,
+                c.qr_token,
+                c.vigencia,
+                au.motivo,
+                au.evidencia_path
+            FROM auditoria_acceso au
+            JOIN admin g ON au.id_guardia = g.id_admin
+            JOIN asignacion ag ON au.id_asignacion = ag.id_asignacion
+            JOIN solicitud s ON ag.id_solicitud = s.id_solicitud
+            JOIN constancia c ON ag.id_asignacion = c.id_asignacion
+            WHERE s.id_alumno = %s AND (au.identidad_confirmada = FALSE OR au.vehiculo_coincide = FALSE)
+            ORDER BY au.fecha_hora DESC
+        """, (id_alumno,))
         
-        id_nuevo = cursor.fetchone()[0]
-        conexion.commit()
-        
-        nombre_completo = f"{datos.nombre} {datos.apellidos}"
-        enviar_correo_credenciales(datos.correo_electronico, nombre_completo, numero_cuenta_guardia, password_plana, "Guardia de Seguridad")
-        
+        filas = cursor.fetchall()
+        resultados = []
+        for f in filas:
+            resultados.append({
+                "id_acceso": f[0],
+                "fecha_rechazo": f[1],
+                "guardia": f[2],
+                "tramite": f[3].upper(),
+                "folio": f[4],
+                "qr_token": str(f[5]),
+                "vigencia": f[6],
+                "motivo": f[7],
+                "evidencia": f[8]
+            })
+
         cursor.close()
         conexion.close()
-        return {
-            "mensaje": f"Guardia creado exitosamente. Se le envió su número de cuenta ({numero_cuenta_guardia}) y contraseña a su correo.", 
-            "id_admin": id_nuevo,
-            "numero_cuenta_generado": numero_cuenta_guardia
-        }
+        return {"numero_cuenta": numero_cuenta, "historial_denegados": resultados}
 
     except Exception as e:
         if conexion:
-            conexion.rollback()
             conexion.close()
-        raise HTTPException(status_code=500, detail=f"Error en BD/Servidor: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+    
 
-@router.put("/solicitudes/{id_solicitud}/en-revision", tags=["Administrador / Personal"], summary="Cambiar el estado de una solicitud a EN REVISION cuando el admin la abre")
-def marcar_solicitud_en_revision(id_solicitud: int, id_admin: int):
+@router.get("/admin/auditoria/accesos/{id_acceso}/evidencia/visualizar", tags=["Administrador / Personal"], summary="Previsualizar la evidencia fotográfica subida por el guardia de forma segura")
+def ver_evidencia_guardia(id_acceso: int):
     conexion = conectar_base()
     if conexion is None:
         raise HTTPException(status_code=500, detail="Error de conexión a la BD")
-
+        
     try:
         cursor = conexion.cursor()
-        cursor.execute("SELECT estado FROM solicitud WHERE id_solicitud = %s", (id_solicitud,))
+        cursor.execute("SELECT evidencia_path FROM auditoria_acceso WHERE id_acceso = %s", (id_acceso,))
         resultado = cursor.fetchone()
-
-        if not resultado:
-            cursor.close()
-            conexion.close()
-            raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
-
-        estado_actual = resultado[0]
         
-        if estado_actual not in ["PENDIENTE", "REPOSICION"]:
-            cursor.close()
-            conexion.close()
-            return {"mensaje": f"La solicitud ya se encuentra en estado {estado_actual}, no se cambió a EN_REVISION."}
-
-        cursor.execute("""
-            UPDATE solicitud 
-            SET estado = 'EN_REVISION', revisado_por = %s, fecha_revision = CURRENT_TIMESTAMP
-            WHERE id_solicitud = %s
-        """, (id_admin, id_solicitud))
-        
-        cursor.execute("""
-            INSERT INTO historial_estados (id_solicitud, estado_anterior, estado_nuevo, id_admin, comentario)
-            VALUES (%s, %s, 'EN_REVISION', %s, 'El administrador ha comenzado a revisar los documentos.')
-        """, (id_solicitud, estado_actual, id_admin))
-
-        conexion.commit()
         cursor.close()
         conexion.close()
+        
+        if not resultado or not resultado[0] or resultado[0] == 'eliminado_fin_semestre':
+            raise HTTPException(status_code=404, detail="No hay evidencia fotográfica para este registro o ya fue eliminada en el cierre de semestre.")
+            
+        archivo_path = resultado[0]
+        ruta_completa = os.path.join("uploads", archivo_path)
+        
+        if not os.path.exists(ruta_completa):
+            raise HTTPException(status_code=404, detail="El archivo físico de la evidencia ya no existe en el servidor.")
+            
+        extension = archivo_path.lower().split('.')[-1]
+        media_type = f"image/{extension}" if extension in ['png', 'jpg', 'jpeg'] else "application/octet-stream"
+            
+        return FileResponse(
+            path=ruta_completa, 
+            media_type=media_type, 
+            filename=archivo_path,
+            content_disposition_type="inline" 
+        )
 
-        return {"mensaje": "La solicitud ahora está EN REVISIÓN.", "nuevo_estado": "EN_REVISION"}
-
+    except HTTPException:
+        raise
     except Exception as e:
         if conexion:
-            conexion.rollback()
             conexion.close()
-        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
-@router.put("/solicitudes/{id_solicitud}/cancelar-revision", tags=["Administrador / Personal"], summary="Cancelar la revisión si el admin se sale sin hacer nada")
-def cancelar_revision(id_solicitud: int):
+
+@router.get("/admin/estadisticas/dashboard", tags=["Administrador / Personal"], summary="Obtener estadísticas para el dashboard")
+def obtener_estadisticas_dashboard():
     conexion = conectar_base()
     if conexion is None:
         raise HTTPException(status_code=500, detail="Error de conexión a la BD")
-
     try:
         cursor = conexion.cursor()
         cursor.execute("""
-            SELECT estado FROM solicitud WHERE id_solicitud = %s
-        """, (id_solicitud,))
-        res = cursor.fetchone()
+            SELECT 
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE estado IN ('PENDIENTE', 'EN_REVISION')) as pendientes,
+                COUNT(*) FILTER (WHERE estado = 'APROBADA') as aprobadas,
+                COUNT(*) FILTER (WHERE estado = 'DOCUMENTACION_INCORRECTA') as rechazadas
+            FROM solicitud;
+        """)
+        sol_stats = cursor.fetchone()
         
-        if not res:
-            cursor.close()
-            conexion.close()
-            raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
-
-        if res[0] != 'EN_REVISION':
-            cursor.close()
-            conexion.close()
-            return {"mensaje": "No se hizo nada porque la solicitud no está en revisión."}
-
         cursor.execute("""
-            UPDATE solicitud SET estado = 'PENDIENTE', revisado_por = NULL WHERE id_solicitud = %s
-        """, (id_solicitud,))
+            SELECT 
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE estado = 'DISPONIBLE') as disponibles,
+                COUNT(*) FILTER (WHERE estado = 'OCUPADO') as ocupados,
+                COUNT(*) FILTER (WHERE estado = 'MANTENIMIENTO') as mantenimiento
+            FROM locker;
+        """)
+        lock_stats = cursor.fetchone()
         
-        conexion.commit()
         cursor.close()
         conexion.close()
-
-        return {"mensaje": "La solicitud ha regresado a estado PENDIENTE."}
-
+        
+        return {
+            "solicitudes": {
+                "total": sol_stats[0],
+                "pendientes": sol_stats[1],
+                "aprobadas": sol_stats[2],
+                "rechazadas": sol_stats[3]
+            },
+            "lockers": {
+                "total": lock_stats[0],
+                "disponibles": lock_stats[1],
+                "ocupados": lock_stats[2],
+                "mantenimiento": lock_stats[3]
+            }
+        }
     except Exception as e:
         if conexion:
-            conexion.rollback()
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
 
 @router.get("/admin/auditoria/solicitudes/excel", tags=["Administrador / Personal"], summary="Descargar auditoria de todas las solicitudes en excel")
 def exportar_auditoria_solicitudes_excel():
@@ -1187,9 +1551,9 @@ def exportar_auditoria_solicitudes_excel():
             SELECT 
                 'FOL-' || LPAD(s.id_solicitud::text, 4, '0') as "Folio", 
                 al.numero_cuenta as "Cuenta Alumno", 
-                al.nombre || ' ' || al.apellidos as "Nombre Alumno",
-                al.carrera as "Carrera",
-                al.correo_electronico as "Correo Alumno",
+                al.nombre || ' ' || al.apellidos as "Nombre Alumno", 
+                al.carrera as "Carrera", 
+                al.correo_electronico as "Correo Alumno", 
                 s.tipo_tramite as "Trámite", 
                 s.estado as "Estado Actual", 
                 TO_CHAR(s.fecha_solicitud, 'YYYY-MM-DD HH24:MI') as "Fecha Solicitud",
@@ -1265,6 +1629,7 @@ def exportar_auditoria_solicitudes_excel():
         if conexion:
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error al generar Excel: {str(e)}")
+
 
 @router.get("/admin/guardia/auditoria-accesos/excel", tags=["Administrador / Personal"], summary="Descargar auditoria de accesos del guardia en excel")
 def exportar_auditoria_accesos_excel():
@@ -1367,192 +1732,3 @@ def exportar_auditoria_accesos_excel():
         if conexion:
             conexion.close()
         raise HTTPException(status_code=500, detail=f"Error al generar Excel: {str(e)}")
-
-@router.get("/admin/auditoria/evidencia-accesos-denegados/{numero_cuenta}", tags=["Administrador / Personal"], summary="Consultar evidencia de accesos denegados en caso de apelacion de un alumno")
-def consultar_evidencias_apelacion(numero_cuenta: str):
-    conexion = conectar_base()
-    if conexion is None:
-        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
-
-    try:
-        cursor = conexion.cursor()
-        cursor.execute("SELECT id_alumno FROM alumno WHERE numero_cuenta = %s", (numero_cuenta,))
-        al_bd = cursor.fetchone()
-        
-        if not al_bd:
-            cursor.close()
-            conexion.close()
-            raise HTTPException(status_code=404, detail="Alumno no encontrado")
-            
-        id_alumno = al_bd[0]
-
-        cursor.execute("""
-            SELECT 
-                au.id_acceso,
-                TO_CHAR(au.fecha_hora, 'YYYY-MM-DD HH24:MI:SS') as fecha,
-                g.nombre || ' ' || g.apellidos AS nombre_guardia,
-                s.tipo_tramite,
-                c.folio,
-                c.qr_token,
-                c.vigencia,
-                au.motivo,
-                au.evidencia_path
-            FROM auditoria_acceso au
-            JOIN admin g ON au.id_guardia = g.id_admin
-            JOIN asignacion ag ON au.id_asignacion = ag.id_asignacion
-            JOIN solicitud s ON ag.id_solicitud = s.id_solicitud
-            JOIN constancia c ON ag.id_asignacion = c.id_asignacion
-            WHERE s.id_alumno = %s AND (au.identidad_confirmada = FALSE OR au.vehiculo_coincide = FALSE)
-            ORDER BY au.fecha_hora DESC
-        """, (id_alumno,))
-        
-        filas = cursor.fetchall()
-        resultados = []
-        for f in filas:
-            resultados.append({
-                "id_acceso": f[0],
-                "fecha_rechazo": f[1],
-                "guardia": f[2],
-                "tramite": f[3].upper(),
-                "folio": f[4],
-                "qr_token": str(f[5]),
-                "vigencia": f[6],
-                "motivo": f[7],
-                "evidencia": f[8]
-            })
-
-        cursor.close()
-        conexion.close()
-        return {"numero_cuenta": numero_cuenta, "historial_denegados": resultados}
-
-    except Exception as e:
-        if conexion:
-            conexion.close()
-        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
-    
-@router.get("/admin/auditoria/accesos/{id_acceso}/evidencia/visualizar", tags=["Administrador / Personal"], summary="Previsualizar la evidencia fotográfica subida por el guardia de forma segura")
-def ver_evidencia_guardia(id_acceso: int):
-    conexion = conectar_base()
-    if conexion is None:
-        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
-        
-    try:
-        cursor = conexion.cursor()
-        cursor.execute("SELECT evidencia_path FROM auditoria_acceso WHERE id_acceso = %s", (id_acceso,))
-        resultado = cursor.fetchone()
-        
-        cursor.close()
-        conexion.close()
-        
-        if not resultado or not resultado[0] or resultado[0] == 'eliminado_fin_semestre':
-            raise HTTPException(status_code=404, detail="No hay evidencia fotográfica para este registro o ya fue eliminada en el cierre de semestre.")
-            
-        archivo_path = resultado[0]
-        ruta_completa = os.path.join("uploads", archivo_path)
-        
-        if not os.path.exists(ruta_completa):
-            raise HTTPException(status_code=404, detail="El archivo físico de la evidencia ya no existe en el servidor.")
-            
-        extension = archivo_path.lower().split('.')[-1]
-        media_type = f"image/{extension}" if extension in ['png', 'jpg', 'jpeg'] else "application/octet-stream"
-            
-        return FileResponse(
-            path=ruta_completa, 
-            media_type=media_type, 
-            filename=archivo_path,
-            content_disposition_type="inline" 
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        if conexion:
-            conexion.close()
-        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
-
-@router.put("/admin/usuarios/{numero_cuenta}/desbloquear-acceso", tags=["Administrador / Personal"], summary="Perdonar los 3 strikes, reactiva la cuenta del alumno y su permiso")
-def desbloquear_acceso_alumno(numero_cuenta: str, datos: ApelacionBloqueo):
-    conexion = conectar_base()
-    if conexion is None:
-        raise HTTPException(status_code=500, detail="Error de conexión a la BD")
-
-    try:
-        cursor = conexion.cursor()
-        
-        cursor.execute("SELECT id_alumno, nombre, apellidos, correo_electronico FROM alumno WHERE numero_cuenta = %s", (numero_cuenta,))
-        alumno_bd = cursor.fetchone()
-        
-        if not alumno_bd:
-            cursor.close()
-            conexion.close()
-            raise HTTPException(status_code=404, detail="Alumno no encontrado.")
-            
-        id_alumno = alumno_bd[0]
-        nombre_completo = f"{alumno_bd[1]} {alumno_bd[2]}"
-        correo_electronico = alumno_bd[3]
-
-        cursor.execute("UPDATE alumno SET estado_activo = TRUE WHERE id_alumno = %s", (id_alumno,))
-        
-        cursor.execute("""
-            UPDATE asignacion a
-            SET estado = 'ACTIVA'
-            FROM solicitud s
-            WHERE a.id_solicitud = s.id_solicitud 
-              AND s.id_alumno = %s 
-              AND a.estado = 'BLOQUEADA'
-            RETURNING s.id_solicitud
-        """, (id_alumno,))
-        
-        solicitudes_restauradas = cursor.fetchall()
-
-        cursor.execute("""
-            UPDATE constancia c
-            SET estado = 'VIGENTE'
-            FROM asignacion a, solicitud s
-            WHERE c.id_asignacion = a.id_asignacion
-              AND a.id_solicitud = s.id_solicitud
-              AND s.id_alumno = %s
-              AND c.estado = 'BLOQUEADO'
-        """, (id_alumno,))
-        
-        for sol in solicitudes_restauradas:
-            cursor.execute("""
-                INSERT INTO historial_estados (id_solicitud, estado_anterior, estado_nuevo, id_admin, comentario)
-                VALUES (%s, 'BLOQUEADA', 'APROBADA', %s, %s)
-            """, (sol[0], datos.id_admin, f"Desbloqueo por apelación: {datos.comentario}"))
-            
-        cursor.execute("""
-            UPDATE auditoria_acceso au
-            SET motivo = motivo || ' [APELADO Y PERDONADO]'
-            FROM asignacion a, solicitud s
-            WHERE au.id_asignacion = a.id_asignacion 
-              AND a.id_solicitud = s.id_solicitud
-              AND s.id_alumno = %s
-              AND (au.identidad_confirmada = FALSE OR au.vehiculo_coincide = FALSE)
-        """, (id_alumno,))
-        
-        cursor.execute("""
-            INSERT INTO notificaciones (numero_cuenta, rol_destino, titulo, mensaje)
-            VALUES (%s, 'ALUMNO', 'Cuenta Restaurada', 'Tu apelación fue aceptada. Tu cuenta y permiso están activos nuevamente.')
-        """, (numero_cuenta,))
-
-        conexion.commit()
-        correo_enviado = enviar_correo_desbloqueo(correo_electronico, nombre_completo)
-
-        cursor.close()
-        conexion.close()
-        
-        mensaje_final = "El alumno y sus permisos han sido desbloqueados exitosamente."
-        if not correo_enviado:
-            mensaje_final += " (Advertencia: Falló el envío del correo de notificación)."
-
-        return {
-            "mensaje": mensaje_final,
-            "permisos_restaurados": len(solicitudes_restauradas)
-        }
-
-    except Exception as e:
-        if conexion:
-            conexion.rollback()
-            conexion.close()
-        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
